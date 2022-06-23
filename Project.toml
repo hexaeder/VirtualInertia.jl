@@ -1,0 +1,13 @@
+name = "EMTSim"
+uuid = "4361663e-8052-47f0-9e5c-92b999e23d48"
+authors = ["Hans Würfel <git@wuerfel.io> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
