@@ -1,7 +1,26 @@
 using EMTSim
 using Documenter
+using Literate
 
 DocMeta.setdocmeta!(EMTSim, :DocTestSetup, :(using EMTSim); recursive=true)
+
+# generate examples
+example_dir = abspath(joinpath(@__DIR__, "..", "examples"))
+outdir = joinpath(@__DIR__, "src", "generated")
+isdir(outdir) && rm(outdir, recursive=true)
+mkpath(outdir)
+
+@info "Create Markdown files from examples"
+
+examples = filter(contains(r".jl$"), readdir(example_dir))
+exlinks = Pair{String,String}[]
+for example in examples
+    path = joinpath(example_dir, example)
+    Literate.markdown(path, outdir)
+
+    barename = example[begin:end-3]
+    push!(exlinks, barename => joinpath("generated", barename*".md"))
+end
 
 makedocs(;
     modules=[EMTSim],
@@ -15,6 +34,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Examples" => exlinks
     ],
 )
 
