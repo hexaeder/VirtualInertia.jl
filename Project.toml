@@ -16,8 +16,17 @@ SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
-julia = "1.6"
 BlockSystems = "0.4"
+CSV = "0.10"
+DataFrames = "1"
+DiffEqCallbacks = "2"
+Graphs = "1"
+ModelingToolkit = "7"
+NetworkDynamics = "0.8"
+OrdinaryDiffEq = "6"
+SteadyStateDiffEq = "1"
+Unitful = "1"
+julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
