@@ -40,3 +40,34 @@ function Tdqinv(t, d, q; ω=2π*50)
 
     return a, b, c
 end
+
+export fixdiv
+function fixdiv(A)
+    for idx in eachindex(A)
+        if A[idx] isa SymbolicUtils.Div
+            A[idx] = eval(Meta.parse(repr(A[idx])))
+        end
+    end
+    A = BlockSystems.narrow_type(A)
+end
+
+export ctrb, obsv
+function ctrb(A, B)
+    N, N2 = size(A)
+    @assert N==N2
+    C = B
+    for i in 1:N-1
+        C = hcat(C, (A^i) * B)
+    end
+    return C
+end
+
+function obsv(A, C)
+    N, N2 = size(A)
+    @assert N==N2
+    O = C
+    for i in 1:N-1
+        O = vcat(O, C * (A^i))
+    end
+    return O
+end
