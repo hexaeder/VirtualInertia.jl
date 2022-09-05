@@ -22,6 +22,25 @@ function ClosedLoop(inner, outer)
     return closed
 end
 
+struct CallableBlockWrapper{F,G}
+    f_ip::F
+    g_oop::G
+    states::Vector{Symbol}
+    inputs::Vector{Symbol}
+    rem_states::Vector{Symbol}
+    params::Vector{Symbol}
+end
+function CallableBlockWrapper(gen)
+    f_ip = gen.f_ip
+    g_oop = gen.g_oop
+    states = map(s->s.name, gen.states)
+    inputs = map(s->s.name, gen.inputs)
+    rem_states = map(s->s.name, gen.rem_states)
+    params = map(s->s.name, gen.params)
+    CallableBlockWrapper{typeof(f_ip), typeof(g_oop)}(f_ip,g_oop,states,inputs,rem_states,params)
+end
+(cbw::CallableBlockWrapper)(du,u,edges,p,t) = cbw.f_ip(du,u,flowsum(edges),p,t)
+
 function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
     cl = ClosedLoop(inner, outer)
     ODEVertex(cl, p_order)
@@ -38,9 +57,7 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
-        f = let f_ip=gen.f_ip
-            (du, u, edges, p, t) -> f_ip(du, u, flowsum(edges), p, t)
-        end
+        f = CallableBlockWrapper(gen)
     elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
         # slack node does not need to know the flowsum
         gen = generate_io_function(iob;
@@ -49,9 +66,7 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
-        f = let f_ip=gen.f_ip
-            (du, u, edges, p, t) -> f_ip(du, u, nothing, p, t)
-        end
+        f = CallableBlockWrapper(gen)
     else
         error("The block should have outputs u_r and u_i. The inputs should be either i_r and i_i or empty (in case of a slack).")
     end
@@ -191,5 +206,6 @@ include("Components.jl")
 include("innerloop.jl")
 include("outerloop.jl")
 include("models.jl")
+include("solution_inspection.jl")
 
 end

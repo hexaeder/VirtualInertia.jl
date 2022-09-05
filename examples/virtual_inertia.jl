@@ -49,11 +49,11 @@ using Unitful
 
 slack = Slack()
 
-droopPT1 = ODEVertex(EMTSim.PT1Source(τ=0.001),
-                     EMTSim.DroopControl(P_ref=-1, Q_ref=0,
+droopPT1 = ODEVertex(EMTSim.PT1Source(τ=0.01),
+                     EMTSim.DroopControl(P_ref=1, Q_ref=0,
                                          V_ref=1, ω_ref=0,
-                                         τ_P=1e-6, K_P=0.01,
-                                         τ_Q=1e-6, K_Q=0.01))
+                                         τ_P=0.01, K_P=0.01,
+                                         τ_Q=0.01, K_Q=0.01))
 
 rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
 
@@ -61,11 +61,22 @@ g = complete_graph(2)
 nd = network_dynamics([slack, droopPT1], rmsedge, g)
 u0 = u0guess(nd)
 
+# @btime nd($(similar(u0)), u0, nothing, 0.0)
 
-tspan = (0, 100)
+tspan = (0, 10)
 prob = ODEProblem(nd, u0, tspan)
 sol = solve(prob, Rodas4())
 
-plot(sol; vars=[:u_r_2, :u_i_2])
-plot(sol; vars=[:P_fil_2, :Q_fil_2])
-plot(sol; vars=[:δ_2])
+plot(timeseries(sol, 2, :Vmag); label="Vmag")
+plot!(timeseries(sol, 2, :Vmag_ref); label="Vmag_ref")
+
+plot(timeseries(sol, 2, :Va); label="Va")
+plot!(timeseries(sol, 2, :Vb); label="Vb")
+plot!(timeseries(sol, 2, :Vc); label="Vc")
+
+plot(timeseries(sol, 2, :Varg); label="Varg")
+plot!(timeseries(sol, 2, :Varg_ref); label="Varg_ref")
+
+plot(timeseries(sol, 2, :P); label="P")
+
+plot!(timeseries(sol, 2, :A))

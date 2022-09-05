@@ -14,6 +14,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NetworkDynamics = "22e9dc34-2a0d-11e9-0de0-8588d035468b"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
