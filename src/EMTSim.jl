@@ -6,6 +6,27 @@ using ModelingToolkit
 
 include("utils.jl")
 
+export ClosedLoop
+
+function ClosedLoop(inner, outer)
+    @assert BlockSpec([:i_i, :i_r, :u_r_ref, :u_i_ref], [:u_r, :u_i])(inner) "Inner ctrl loop does not meet expectation."
+    @assert BlockSpec([], [:u_r_ref, :u_i_ref]; in_strict=false)(outer)  "Outer ctrl loop does not meet expectation."
+
+    sys = IOSystem(:autocon, [outer, inner];
+                   name=Symbol(string(outer.name)*"_"*string(inner.name)),
+                   outputs=:remaining)
+    closed = connect_system(sys)
+
+    @assert BlockSpec([:i_i, :i_r], [:u_r, :u_i])(closed) "Closed loop does not match expectation!"
+
+    return closed
+end
+
+function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
+    cl = ClosedLoop(inner, outer)
+    ODEVertex(cl, p_order)
+end
+
 function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
     @assert length(p_order) == length(iob.iparams) "Provide order of all iparams!"
 
@@ -17,8 +38,9 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
-
-        f = (du, u, edges, p, t) -> gen.f_ip(du, u, flowsum(edges), p, t)
+        f = let f_ip=gen.f_ip
+            (du, u, edges, p, t) -> f_ip(du, u, flowsum(edges), p, t)
+        end
     elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
         # slack node does not need to know the flowsum
         gen = generate_io_function(iob;
@@ -27,7 +49,9 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
-        f = (du, u, edges, p, t) -> gen.f_ip(du, u, nothing, p, t)
+        f = let f_ip=gen.f_ip
+            (du, u, edges, p, t) -> f_ip(du, u, nothing, p, t)
+        end
     else
         error("The block should have outputs u_r and u_i. The inputs should be either i_r and i_i or empty (in case of a slack).")
     end
@@ -161,5 +185,11 @@ function flowsum(edges)
     end
     return (i_r, i_i)
 end
+
+
+include("Components.jl")
+include("innerloop.jl")
+include("outerloop.jl")
+include("models.jl")
 
 end
