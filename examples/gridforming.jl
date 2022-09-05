@@ -9,7 +9,7 @@ using SteadyStateDiffEq
 using Plots
 using Unitful
 using LinearAlgebra
-G
+
 function get_rfcA(sym)
     @variables t x_d(t) x_q(t)
     @parameters x_r(t) x_i(t) δ(t)

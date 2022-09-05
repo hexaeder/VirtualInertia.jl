@@ -1,7 +1,7 @@
 #=
 # Disconnect load from slack
 In this example, we examine the voltage transient of the system
-after a single load of constant P is isconnected from a slack.
+after a single load of constant P is disconnected from a slack.
 =#
 using EMTSim
 using BlockSystems
@@ -18,11 +18,17 @@ using DataFrames
 
 #=
 ## Constants and unit stuff.
+
+!!! Note
+    The grid is modelled in a gloabal dq-Frame without zero component. Since we
+    might need to introduce *local* dq frames for the inverters too, the global
+    frame is denoted by `_r` and `_i` (for real and imag part) annotations while
+    the local frames use `_d` and `_q`.
 =#
 ω0    = 2π*50u"rad/s"
 Sbase = 300u"MW"
 Vbase = 110u"kV" #* sqrt(2/3)
-Ibase = Sbase/(Vbase )#* √3) # why the √3 ?
+Ibase = Sbase/(Vbase)#* √3) # why the √3 ?
 Cbase = Ibase/Vbase
 Lbase = Vbase/Ibase
 Rbase = (Vbase^2)/Sbase
@@ -36,12 +42,12 @@ Lline = (1/100π)u"H" / Lbase    |> u"s"
 nothing#hide
 #=
 ## Slack Bus
-The slack bus is modelld as a node with ``\dot(u) = 0``, i'll keep the initial voltage forever.
+The slack bus is modelled as a node with ``\dot(u) = 0``, i'll keep the initial voltage forever.
 =#
-@variables t u_d(t) u_q(t)
+@variables t u_r(t) u_i(t)
 dt = Differential(t)
 
-slackblock = IOBlock([dt(u_d) ~ 0, dt(u_q) ~ 0], [], [u_d, u_q]; name=:slack)
+slackblock = IOBlock([dt(u_r) ~ 0, dt(u_i) ~ 0], [], [u_r, u_i]; name=:slack)
 
 # create ODE Vertex from this block
 slack = ODEVertex(slackblock)
@@ -58,11 +64,11 @@ purely ohmic (no phase shift) but constant in P. Since the voltage on bus 2 is s
 1 pu, we can not trivially calculate the corresponding resistance.
 
 ```
-@variables t i_d(t) i_q(t)
-@parameters u_d(t) u_q(t) R
-loadblock = IOBlock([i_d ~ -1/R * u_d,
-                     i_q ~ -1/R * u_q],
-                    [u_d, u_q], [i_d, i_q],
+@variables t i_r(t) i_i(t)
+@parameters u_r(t) u_i(t) R
+loadblock = IOBlock([i_r ~ -1/R * u_r,
+                     i_i ~ -1/R * u_i],
+                    [u_r, u_i], [i_r, i_i],
                     name=:load)
 
 # The load is used as a current source in a `BusBar`
@@ -79,8 +85,8 @@ load = ODEVertex(busblock, [:load₊R])
 ## Constant P Load
 For a constant load P we may use the algebric current equation
 ```math
-i_d = P \frac{u_d}{u_d^2 + u_q^2}\\
-i_q = P \frac{u_q}{u_d^2 + u_q^2}
+i_r = P \frac{u_r}{u_r^2 + u_i^2}\\
+i_i = P \frac{u_i}{u_r^2 + u_i^2}
 ```
 However, this leads to instability in the model and is hard to initialize. I guess it is not a
 good idea to follow each oszillation in node/condensator voltage!
@@ -88,17 +94,17 @@ good idea to follow each oszillation in node/condensator voltage!
 To circumvent the problem, we model the P load using a lowpass filter
 
 ```math
-\dot{i_d} = \frac{1}{\tau}\left(P \frac{u_d}{u_d^2 + u_q^2} - i_d\right)\\
-\dot{i_q} = \frac{1}{\tau}\left(P \frac{u_q}{u_d^2 + u_q^2} - i_q\right)
+\dot{i_r} = \frac{1}{\tau}\left(P \frac{u_r}{u_r^2 + u_i^2} - i_r\right)\\
+\dot{i_i} = \frac{1}{\tau}\left(P \frac{u_i}{u_r^2 + u_i^2} - i_i\right)
 ```
 whose time constant ``\tau = \frac{1}{\omega_0}`` is chosen in a way, that
 disturbances higher than the nominal grid frequency are damped.
 =#
-@variables t i_d(t) i_q(t)
-@parameters u_d(t) u_q(t) P τ
-loadblock = IOBlock([dt(i_d) ~ ustrip(u"rad/s", ω0)*(P * u_d/(u_d^2 + u_q^2) - i_d),
-                     dt(i_q) ~ ustrip(u"rad/s", ω0)*(P * u_q/(u_d^2 + u_q^2) - i_q)],
-                    [u_d, u_q], [i_d, i_q],
+@variables t i_r(t) i_i(t)
+@parameters u_r(t) u_i(t) P τ
+loadblock = IOBlock([dt(i_r) ~ ustrip(u"rad/s", ω0)*(P * u_r/(u_r^2 + u_i^2) - i_r),
+                     dt(i_i) ~ ustrip(u"rad/s", ω0)*(P * u_i/(u_r^2 + u_i^2) - i_i)],
+                    [u_r, u_i], [i_r, i_i],
                     name=:load)
 
 # The load is used as a current source in a `BusBar`
@@ -113,15 +119,16 @@ nothing#hide
 #=
 ## ODE edge for the RL Line
 =#
-@variables t i_d(t) i_q(t)
-@parameters u_d_src(t) u_q_src(t) u_d_dst(t) u_q_dst(t) R L ω
+@variables t i_r(t) i_i(t)
+@parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R L ω
 
-lineblock = IOBlock([dt(i_d) ~  ω * i_q  - R/L * i_d + 1/L*(u_d_src - u_d_dst),
-                     dt(i_q) ~ -ω * i_d  - R/L * i_q + 1/L*(u_q_src - u_q_dst)],
-                    [u_d_src, u_q_src, u_d_dst, u_q_dst],
-                    [i_d, i_q],
+lineblock = IOBlock([dt(i_r) ~  ω * i_i  - R/L * i_r + 1/L*(u_r_src - u_r_dst),
+                     dt(i_i) ~ -ω * i_r  - R/L * i_i + 1/L*(u_i_src - u_i_dst)],
+                    [u_r_src, u_i_src, u_r_dst, u_i_dst],
+                    [i_r, i_i],
                     name=:RLLine)
 lineblock = set_p(lineblock, Dict(:R=>NoUnits(Rline), :L=>ustrip(u"s", Lline), :ω=>ustrip(u"rad/s", ω0)))
+
 # This block can be used to create an ODEEdge
 edge = ODEEdge(lineblock)
 

@@ -9,27 +9,27 @@ include("utils.jl")
 function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
     @assert length(p_order) == length(iob.iparams) "Provide order of all iparams!"
 
-    if fulfills(iob, BlockSpec([:i_d, :i_q], [:u_d, :u_q]))
+    if fulfills(iob, BlockSpec([:i_r, :i_i], [:u_r, :u_i]))
         # normal node
         gen = generate_io_function(iob;
-                                   f_states=[iob.u_d, iob.u_q],
-                                   f_inputs=[iob.i_d, iob.i_q],
+                                   f_states=[iob.u_r, iob.u_i],
+                                   f_inputs=[iob.i_r, iob.i_i],
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
 
         f = (du, u, edges, p, t) -> gen.f_ip(du, u, flowsum(edges), p, t)
-    elseif fulfills(iob, BlockSpec([], [:u_d, :u_q]))
+    elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
         # slack node does not need to know the flowsum
         gen = generate_io_function(iob;
-                                   f_states=[iob.u_d, iob.u_q],
+                                   f_states=[iob.u_r, iob.u_i],
                                    f_inputs=[],
                                    f_params=p_order,
                                    warn=true,
                                    type=:ode)
         f = (du, u, edges, p, t) -> gen.f_ip(du, u, nothing, p, t)
     else
-        error("The block should have outputs u_d and u_q. The inputs should be either i_d and i_q or empty (in case of a slack).")
+        error("The block should have outputs u_r and u_i. The inputs should be either i_r and i_i or empty (in case of a slack).")
     end
 
     vars = Symbol.(gen.states)
@@ -39,11 +39,11 @@ end
 # special function definition for empty bus
 # function BusBar(; name=gensym(:Bus), verbose=false)
 #     # busBar without any elements
-#     @parameters t i_d(t) i_q(t) C ω0
-#     @variables u_d(t) u_q(t)
+#     @parameters t i_r(t) i_i(t) C ω0
+#     @variables u_r(t) u_i(t)
 
-#     bar = IOBlock([dt(u_d) ~ -ω0 * u_q - 1 / C * i_d,
-#                    dt(u_q) ~ -ω0 * u_d - 1 / C * i_q],
+#     bar = IOBlock([dt(u_r) ~ -ω0 * u_i - 1 / C * i_r,
+#                    dt(u_i) ~ -ω0 * u_r - 1 / C * i_i],
 #                   [i_r, i_i], [u_r, u_i];
 #                   iv=t, name, warn=false)
 # end
@@ -51,49 +51,49 @@ end
 export BusBar
 function BusBar(injectors...; name=gensym(:Bus), verbose=false)
     for inj in injectors
-        @assert BlockSpec([:u_d, :u_q], [:i_d, :i_q])(inj) "Injector $inj does not satisfy injector interface!"
+        @assert BlockSpec([:u_r, :u_i], [:i_r, :i_i])(inj) "Injector $inj does not satisfy injector interface!"
     end
 
     # TODO assert that all iv ar equal, prob done in BlockSystems?
     @variables t
-    id, iq = Num[], Num[]
+    ir, ii = Num[], Num[]
     for i in 1:length(injectors)
-        ids = subscript(:i_d, i)
-        iqs = subscript(:i_q, i)
-        append!(id, @parameters $ids(t))
-        append!(iq, @parameters $iqs(t))
+        irs = subscript(:i_r, i)
+        iqs = subscript(:i_i, i)
+        append!(ir, @parameters $irs(t))
+        append!(ii, @parameters $iqs(t))
     end
 
-    @parameters i_d(t) i_q(t) C ω0
-    @variables u_d(t) u_q(t)
+    @parameters i_r(t) i_i(t) C ω0
+    @variables u_r(t) u_i(t)
     dt = Differential(t)
 
     addall(list...) = isempty(list) ? 0 : (+)(list...)
 
-    @named bar = IOBlock([dt(u_d) ~  ω0*u_q + 1/C * (addall(id...) + i_d),
-                          dt(u_q) ~ -ω0*u_d + 1/C * (addall(iq...) + i_q)],
-                         [i_d, i_q, id..., iq...],
-                         [u_d, u_q];
+    @named bar = IOBlock([dt(u_r) ~  ω0*u_i + 1/C * (addall(ir...) + i_r),
+                          dt(u_i) ~ -ω0*u_r + 1/C * (addall(ii...) + i_i)],
+                         [i_r, i_i, ir..., ii...],
+                         [u_r, u_i];
                          iv=t, warn=false)
 
     connections = Pair[]
     for (i, inj) in enumerate(injectors)
-        push!(connections, inj.i_d => getproperty(bar, subscript(:i_d, i)))
-        push!(connections, inj.i_q => getproperty(bar, subscript(:i_q, i)))
-        push!(connections, bar.u_d => inj.u_d)
-        push!(connections, bar.u_q => inj.u_q)
+        push!(connections, inj.i_r => getproperty(bar, subscript(:i_r, i)))
+        push!(connections, inj.i_i => getproperty(bar, subscript(:i_i, i)))
+        push!(connections, bar.u_r => inj.u_r)
+        push!(connections, bar.u_i => inj.u_i)
     end
 
-    promotions = [bar.u_d => :u_d,
-                  bar.u_q => :u_q,
-                  bar.i_d => :i_d,
-                  bar.i_q => :i_q,
+    promotions = [bar.u_r => :u_r,
+                  bar.u_i => :u_i,
+                  bar.i_r => :i_r,
+                  bar.i_i => :i_i,
                   bar.ω0  => :ω0,
                   bar.C   => :C]
 
     sys = IOSystem(connections, [bar, injectors...];
                    namespace_map=promotions, autopromote=false,
-                   outputs=[bar.u_d, bar.u_q],
+                   outputs=[bar.u_r, bar.u_i],
                    name)
 
     return connect_system(sys; verbose=verbose)
@@ -102,20 +102,20 @@ end
 """
 Conventions:
 (Anti-)symmetric lines:
-  - inputs:   `u_d_src`, `u_q_src`, `u_d_dst`, `u_q_dst`
-  - outputs:  `i_d`, `i_q`
+  - inputs:   `u_r_src`, `u_i_src`, `u_r_dst`, `u_i_dst`
+  - outputs:  `i_r`, `i_i`
   - current direction is defined from src to dst
-  - dst node will receive `-i_d`, `-i_q`
+  - dst node will receive `-i_r`, `-i_i`
 Asymmetric lines:
-  - inputs:   `u_d_src`, `u_q_src`, `u_d_dst`, `u_q_dst`
-  - outputs:  `i_d_src`, `i_q_src`, `i_d_dst`, `i_q_dst`
+  - inputs:   `u_r_src`, `u_i_src`, `u_r_dst`, `u_i_dst`
+  - outputs:  `i_r_src`, `i_i_src`, `i_r_dst`, `i_i_dst`
   - not yet implemented. might by tricky with fidutial...
 """
 function NetworkDynamics.ODEEdge(iob::IOBlock, p_order=[])
-    symspec = BlockSpec([:u_d_src, :u_q_src, :u_d_dst, :u_q_dst],
-                        [:i_d, :i_q])
-    asymspec = BlockSpec([:u_d_src, :u_q_src, :u_d_dst, :u_q_dst],
-                         [:i_d_src, :i_q_src, :i_d_dst, :i_q_dst])
+    symspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+                        [:i_r, :i_i])
+    asymspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+                         [:i_r_src, :i_i_src, :i_r_dst, :i_i_dst])
 
     if fulfills(iob, symspec)
         return _odeedge_symmetric(iob::IOBlock, p_order)
@@ -129,9 +129,9 @@ end
 
 function _odeedge_symmetric(iob, p_order)
     gen = generate_io_function(iob;
-                               f_states=[iob.i_d, iob.i_q],
-                               f_inputs=[iob.u_d_src, iob.u_q_src,
-                                         iob.u_d_dst, iob.u_q_dst],
+                               f_states=[iob.i_r, iob.i_i],
+                               f_inputs=[iob.u_r_src, iob.u_i_src,
+                                         iob.u_r_dst, iob.u_i_dst],
                                f_params=p_order,
                                warn=true,
                                type=:ode)
@@ -154,12 +154,12 @@ function _odeedge_symmetric(iob, p_order)
 end
 
 function flowsum(edges)
-    i_d, i_q = 0.0, 0.0
+    i_r, i_i = 0.0, 0.0
     for e in edges
-        i_d += e[1]
-        i_q += e[2]
+        i_r += e[1]
+        i_i += e[2]
     end
-    return (i_d, i_q)
+    return (i_r, i_i)
 end
 
 end
