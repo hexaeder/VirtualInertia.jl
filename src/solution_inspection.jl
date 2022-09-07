@@ -1,0 +1,82 @@
+using LinearAlgebra: norm
+export blockstates, getstate, timeseries
+
+
+blockstates(sol, idx) = blockstates(sol.prob.f, idx)
+function blockstates(nd::ODEFunction, idx)
+    wrapper = _getwrapper(nd,idx)
+    vcat(wrapper.states, wrapper.rem_states)
+end
+
+function _getwrapper(nd, idx)
+    ndobj = nd.f
+    _group = findfirst(group -> idx ∈ group, ndobj.unique_v_indices)
+    ndobj.unique_vertices![_group].f
+end
+
+getstate(sol, t::Number, idx, state) = getstate(sol, t, nothing, idx, state)
+function getstate(sol, t::Number, p, idx, state)
+    nd = sol.prob.f
+    x = sol(t)
+    gd = nd(x, p, t, GetGD)
+    vstate = collect(get_vertex(gd, idx))
+    wrapper = _getwrapper(nd, idx)
+
+    if state ∈ wrapper.states
+        stateidx = findfirst(s->s==state, wrapper.states)
+        return vstate[stateidx]
+    elseif state ∈ wrapper.rem_states
+        stateidx = findfirst(s->s==state, wrapper.rem_states)
+        input = flowsum(get_dst_edges(gd, idx))
+        pblock = p isa Tuple ? p[1][idx] : nothing
+        return wrapper.g_oop(vstate, input, pblock, t)[stateidx]
+    elseif state==:Vmag
+        return norm(vstate[1:2])
+    elseif state==:Varg
+        return atan(vstate[2], vstate[1])
+    elseif state==:imag
+        input = flowsum(get_dst_edges(gd, idx))
+        return norm(input[1:2])
+    elseif state==:iarg
+        input = flowsum(get_dst_edges(gd, idx))
+        return atan(input[2], input[1])
+    elseif state==:Vmag_ref
+        u_r_ref = getstate(sol, t, p, idx, :u_r_ref)
+        u_i_ref = getstate(sol, t, p, idx, :u_i_ref)
+        return norm([u_r_ref, u_i_ref])
+    elseif state==:Varg_ref
+        u_r_ref = getstate(sol, t, p, idx, :u_r_ref)
+        u_i_ref = getstate(sol, t, p, idx, :u_i_ref)
+        return atan(u_i_ref, u_r_ref)
+    elseif state==:Va
+        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[1]
+    elseif state==:Vb
+        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[2]
+    elseif state==:Vc
+        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[3]
+    else
+        error("Don't know state $state.")
+    end
+end
+
+timeseries(sol, ts, idx::Int, state) = timeseries(sol, ts, nothing, idx, state)
+timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
+
+timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
+function timeseries(sol, p, idx::Int, state; dtmax=0.0005)
+    if p==nothing && sol.prob.p !==nothing
+        p = sol.prob.p
+        if p !== SciMLBase.NullParameters()
+            @warn "I am using the p from the problem $p to recover states. Be carefull, this might be wrong afer callbacks."
+        end
+    end
+
+    ts = [sol.t[begin]]
+    for i in eachindex(sol.t)[begin+1:end]
+        while !isnothing(dtmax) && ts[end] + dtmax < sol.t[i]
+            push!(ts, ts[end]+dtmax)
+        end
+        push!(ts, sol.t[i])
+    end
+    timeseries(sol, ts, p, idx, state)
+end

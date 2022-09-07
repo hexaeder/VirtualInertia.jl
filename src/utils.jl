@@ -71,3 +71,32 @@ function obsv(A, C)
     end
     return O
 end
+
+export @labelled
+macro labelled(ex)
+    qn = _find_quot_node(ex)
+    isnothing(qn) && error("Did not find symbol.")
+
+    if Meta.isexpr(ex, :call)
+        pushfirst!(ex.args, ex.args[begin])
+        ex.args[2] = Expr(:parameters, Expr(:kw, :label, :(string($qn))))
+    else
+        error("Malformed expresseion")
+    end
+    esc(ex)
+end
+
+function _find_quot_node(ex)
+    if ex isa QuoteNode
+        return ex
+    elseif ex isa Expr
+        for arg in ex.args
+            node = _find_quot_node(arg)
+            if node isa QuoteNode
+                return node
+            end
+        end
+    end
+    return nothing
+end
+

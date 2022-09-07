@@ -43,6 +43,11 @@ end
 
 function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
     cl = ClosedLoop(inner, outer)
+    open_p = ModelingToolkit.getname.(cl.iparams)
+    if isempty(p_order) && !isempty(open_p)
+        @warn "Model has open parameters $open_p. ODEVertex will use that order. You may specify manuallly using the `p_order` kw."
+        p_order = open_p
+    end
     ODEVertex(cl, p_order)
 end
 
@@ -88,7 +93,7 @@ end
 # end
 
 export BusBar
-function BusBar(injectors...; name=gensym(:Bus), verbose=false)
+function BusBar(injectors...; name=gensym(:Bus), verbose=false, autopromote=false)
     for inj in injectors
         @assert BlockSpec([:u_r, :u_i], [:i_r, :i_i])(inj) "Injector $inj does not satisfy injector interface!"
     end
@@ -131,7 +136,7 @@ function BusBar(injectors...; name=gensym(:Bus), verbose=false)
                   bar.C   => :C]
 
     sys = IOSystem(connections, [bar, injectors...];
-                   namespace_map=promotions, autopromote=false,
+                   namespace_map=promotions, autopromote,
                    outputs=[bar.u_r, bar.u_i],
                    name)
 
@@ -178,13 +183,8 @@ function _odeedge_symmetric(iob, p_order)
     N != 2 && error("Does not work with internal states in the line right know!")
 
     f = function (du, u, src, dst, p, t)
-        # TODO: allocation free stack
-        gen.f_ip(du, u, vcat(src, dst), p, t)
-        du[(N + 1):(2N)] .= -1.0 .* du[1:N]
-        # # du[(N + 1):(2N)] .= du[N + 1]
-        # # du[1:N] .*= -1.0
-        # du .= -1.0 .* du
-        # println(du)
+        @views gen.f_ip(du[1:2], u[1:2], (src[1], src[2], dst[1], dst[2]), p, t)
+        @views gen.f_ip(du[3:4], u[3:4], (dst[1], dst[2], src[1], src[2]), p, t)
     end
     names = String.(Symbol.(gen.states))
     sym = Symbol.(vcat(names .* "_dst", names .* "_src"))
