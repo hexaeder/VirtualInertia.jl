@@ -21,22 +21,6 @@ Rline = 0.354u"Ω" / Rbase       |> u"pu"
 Lline = 350e-6u"H" / Lbase      |> u"s"
 Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
-
-#=
-Super sophisticated initial guess.
-=#
-u0guess(nd::ODEFunction) = u0guess.(nd.syms)
-function u0guess(s::Symbol)
-    s = string(s)
-    if occursin(r"^u_r", s)
-        1.0
-    elseif occursin(r"^A", s)
-        1.0
-    else
-        0.0
-    end
-end
-
 using EMTSim
 using BlockSystems
 using NetworkDynamics
@@ -45,6 +29,8 @@ using OrdinaryDiffEq
 using DiffEqCallbacks
 using SteadyStateDiffEq
 using Plots
+import CairoMakie
+using GraphMakie
 using Unitful
 
 #=

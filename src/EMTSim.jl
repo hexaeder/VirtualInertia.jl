@@ -93,9 +93,9 @@ end
 # end
 
 export BusBar
-function BusBar(injectors...; name=gensym(:Bus), verbose=false, autopromote=false)
+function BusBar(injectors...; name=:Bus, verbose=false, autopromote=false, EMT=true)
     for inj in injectors
-        @assert BlockSpec([:u_r, :u_i], [:i_r, :i_i])(inj) "Injector $inj does not satisfy injector interface!"
+        @assert BlockSpec([:u_r, :u_i], [:i_r, :i_i]; in_strict=false)(inj) "Injector $inj does not satisfy injector interface!"
     end
 
     # TODO assert that all iv ar equal, prob done in BlockSystems?
@@ -108,17 +108,26 @@ function BusBar(injectors...; name=gensym(:Bus), verbose=false, autopromote=fals
         append!(ii, @parameters $iqs(t))
     end
 
-    @parameters i_r(t) i_i(t) C ω0
+    @parameters i_r(t) i_i(t)
     @variables u_r(t) u_i(t)
     dt = Differential(t)
 
     addall(list...) = isempty(list) ? 0 : (+)(list...)
 
-    @named bar = IOBlock([dt(u_r) ~  ω0*u_i + 1/C * (addall(ir...) + i_r),
-                          dt(u_i) ~ -ω0*u_r + 1/C * (addall(ii...) + i_i)],
-                         [i_r, i_i, ir..., ii...],
-                         [u_r, u_i];
-                         iv=t, warn=false)
+    if EMT
+        @parameters C ω0
+        @named bar = IOBlock([dt(u_r) ~  ω0*u_i + 1/C * (addall(ir...) + i_r),
+                              dt(u_i) ~ -ω0*u_r + 1/C * (addall(ii...) + i_i)],
+                             [i_r, i_i, ir..., ii...],
+                             [u_r, u_i];
+                             iv=t, warn=false)
+    else
+        @named bar = IOBlock([0 ~ (addall(ir...) + i_r),
+                              0 ~ (addall(ii...) + i_i)],
+                             [i_r, i_i, ir..., ii...],
+                             [u_r, u_i];
+                             iv=t, warn=false)
+    end
 
     connections = Pair[]
     for (i, inj) in enumerate(injectors)
@@ -131,9 +140,11 @@ function BusBar(injectors...; name=gensym(:Bus), verbose=false, autopromote=fals
     promotions = [bar.u_r => :u_r,
                   bar.u_i => :u_i,
                   bar.i_r => :i_r,
-                  bar.i_i => :i_i,
-                  bar.ω0  => :ω0,
-                  bar.C   => :C]
+                  bar.i_i => :i_i]
+
+    if EMT
+        promotions = vcat(promotions, [bar.ω0=>:ω0, bar.C=>:C])
+    end
 
     sys = IOSystem(connections, [bar, injectors...];
                    namespace_map=promotions, autopromote,

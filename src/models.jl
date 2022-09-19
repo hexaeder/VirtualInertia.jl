@@ -1,4 +1,4 @@
-export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT
+export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS
 
 function RMSPiLine(; L, R, C1, C2)
     let ω=2π*50, L=L, R=R, C1=C1, C2=C2
@@ -87,6 +87,33 @@ function PT1PLoadEMT(;params...)
                         name=:load)
     loadblock = substitute_algebraic_states(loadblock)
     bus = BusBar(loadblock; name=:loadbus, autopromote=true)
+    bus = set_p(bus, params)
+    ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
+end
+
+function SecondaryControlCS(; EMT=false, params...)
+    cs = Components.PT1CurrentSource()
+    cs = set_p(cs; τ=0.01)
+
+    pll = Components.ReducedPLL()
+    pll = set_p(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
+
+    @variables t P_ref_pi(t) μ(t)
+    @parameters P_ref ω(t) Ki Kp
+    dt = Differential(t)
+    ctrl = IOBlock([dt(μ) ~ -ω,
+                    P_ref_pi ~ P_ref + Ki*μ - Kp*ω],
+                   [ω], [P_ref_pi],
+                   name=:PrefICtrl)
+
+    @named pisrc = IOSystem([pll.ω_pll=>ctrl.ω,
+                             ctrl.P_ref_pi=>cs.P_ref],
+                            [pll, cs, ctrl],
+                            outputs=[cs.i_r, cs.i_i],
+                            globalp=[:u_r, :u_i])
+    pisrc = connect_system(pisrc)
+
+    bus = BusBar(pisrc; autopromote=true, EMT)
     bus = set_p(bus, params)
     ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
 end

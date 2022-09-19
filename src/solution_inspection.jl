@@ -1,4 +1,5 @@
 using LinearAlgebra: norm
+using SciMLBase
 export blockstates, getstate, timeseries
 
 
@@ -54,6 +55,14 @@ function getstate(sol, t::Number, p, idx, state)
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[2]
     elseif state==:Vc
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[3]
+    elseif state==:Smeas
+        u_r, u_i = vstate[1:2]
+        i_r, i_i = flowsum(get_dst_edges(gd, idx))
+        return (u_r + im*u_i)*(i_r - im*i_i)
+    elseif state==:Pmeas
+        return real(getstate(sol, t, p, idx, :Smeas))
+    elseif state==:Qmeas
+        return imag(getstate(sol, t, p, idx, :Smeas))
     else
         error("Don't know state $state.")
     end
@@ -63,7 +72,7 @@ timeseries(sol, ts, idx::Int, state) = timeseries(sol, ts, nothing, idx, state)
 timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
 
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
-function timeseries(sol, p, idx::Int, state; dtmax=0.0005)
+function timeseries(sol, p, idx::Int, state; dtmax=0.01)
     if p==nothing && sol.prob.p !==nothing
         p = sol.prob.p
         if p !== SciMLBase.NullParameters()

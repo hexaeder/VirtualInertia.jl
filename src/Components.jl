@@ -1,3 +1,5 @@
+export Components
+
 module Components
 
 using BlockSystems
@@ -160,6 +162,53 @@ function UIMeas(; name=:ui_meas, renamings...)
                     [u_r_meas, u_i_meas, i_r_meas, i_i_meas];
                     name)
 
+    rename_vars(block; renamings...)
+end
+
+function ReducedPLL(; name=:pll, renamings...)
+    @variables t δ_pll(t) ω_pll(t) μ_pll(t) u_qpll(t) u_q(t)
+    @parameters u_r(t) u_i(t) Kp Ki ω_lp
+    dt = Differential(t)
+    block = IOBlock([u_q ~ 1/sqrt(u_r^2+u_i^2)*(u_r*sin(-δ_pll) + u_i*cos(-δ_pll)),
+                     dt(u_qpll) ~ ω_lp*(u_q - u_qpll),
+                     dt(μ_pll) ~ u_qpll,
+                     ω_pll ~ Kp*u_qpll + Ki*μ_pll,
+                     dt(δ_pll) ~ ω_pll
+                     ],
+                    [u_r, u_i],
+                    [δ_pll, ω_pll];
+                    name)
+    block = substitute_algebraic_states(block)
+    rename_vars(block; renamings...)
+end
+
+function KauraPLL(; name=:pll, renamings...)
+    @variables t δ_pll(t) ω_pll(t) ϵ_pll(t) u_d_pll(t) u_q_pll(t) u_d_out(t) u_q_out(t)
+    @parameters u_r(t) u_i(t) Kp Ki ω_lp
+    dt = Differential(t)
+    block = IOBlock([u_d_out ~ 1/sqrt(u_r^2+u_i^2)*(u_r*cos(-δ_pll) - u_i*sin(-δ_pll)),
+                     u_q_out ~ 1/sqrt(u_r^2+u_i^2)*(u_r*sin(-δ_pll) + u_i*cos(-δ_pll)),
+                     dt(u_d_pll) ~ ω_lp*(u_d_out - u_d_pll),
+                     dt(u_q_pll) ~ ω_lp*(u_q_out - u_q_pll),
+                     dt(ϵ_pll) ~ atan(u_q_pll, u_d_pll),
+                     ω_pll ~ Kp*atan(u_q_pll, u_d_pll) + Ki* ϵ_pll,
+                     dt(δ_pll) ~ ω_pll
+                     ],
+                    [u_r, u_i],
+                    [δ_pll, ω_pll];
+                    name)
+    block = substitute_algebraic_states(block)
+    rename_vars(block; renamings...)
+end
+
+function PT1CurrentSource(; name=:CS, renamings...)
+    @variables t i_r(t) i_i(t)
+    @parameters P_ref(t) τ u_r(t) u_i(t)
+    dt = Differential(t)
+    block = IOBlock([dt(i_r) ~ 1/τ * (P_ref * u_r/(u_r^2 + u_i^2) - i_r),
+                     dt(i_i) ~ 1/τ * (P_ref * u_i/(u_r^2 + u_i^2) - i_i)],
+                    [u_r, u_i, P_ref], [i_r, i_i],
+                    name=:CS)
     rename_vars(block; renamings...)
 end
 

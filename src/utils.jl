@@ -100,3 +100,15 @@ function _find_quot_node(ex)
     return nothing
 end
 
+export u0guess
+u0guess(nd::ODEFunction) = u0guess.(nd.syms)
+function u0guess(s::Symbol)
+    s = string(s)
+    if occursin(r"^u_r", s)
+        1.0
+    elseif occursin(r"^A", s)
+        1.0
+    else
+        0.0
+    end
+end
