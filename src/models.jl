@@ -42,24 +42,6 @@ function Slack()
     ODEVertex(slackblock)
 end
 
-function PT1PLoad(;params...)
-    @variables t i_inj_r(t) i_inj_i(t) P_meas(t) Q_meas(t) u_r(t) u_i(t)
-    @parameters P_ref τ i_r(t) i_i(t)
-    dt = Differential(t)
-    loadblock = IOBlock([P_meas ~ u_r*i_inj_r + u_i*i_inj_i,
-                         Q_meas ~ i_inj_r*u_i - i_inj_i*u_r,
-                         dt(i_inj_r) ~ 1/τ * (P_ref * u_r/(u_r^2 + u_i^2) - i_inj_r),
-                         dt(i_inj_i) ~ 1/τ * (P_ref * u_i/(u_r^2 + u_i^2) - i_inj_i),
-                         0 ~ i_inj_r + i_r,
-                         0 ~ i_inj_i + i_i],
-                        [i_r, i_i], [u_r, u_i],
-                        name=:load)
-    loadblock = substitute_algebraic_states(loadblock)
-    loadblock = set_p(loadblock, params)
-
-    ODEVertex(loadblock, ModelingToolkit.getname.(loadblock.iparams))
-end
-
 function ConstPLoad(;params...)
     @variables t P_meas(t) Q_meas(t) u_r(t) u_i(t)
     @parameters P_ref i_r(t) i_i(t)
@@ -75,25 +57,17 @@ function ConstPLoad(;params...)
     ODEVertex(loadblock, ModelingToolkit.getname.(loadblock.iparams))
 end
 
-function PT1PLoadEMT(;params...)
-    @variables t i_r(t) i_i(t) P_meas(t) Q_meas(t)
-    @parameters u_r(t) u_i(t) P_ref τ
-    dt = Differential(t)
-    loadblock = IOBlock([P_meas ~ u_r*i_r + u_i*i_i,
-                         Q_meas ~ i_r*u_i - i_i*u_r,
-                         dt(i_r) ~ 1/τ*(P_ref * u_r/(u_r^2 + u_i^2) - i_r),
-                         dt(i_i) ~ 1/τ*(P_ref * u_i/(u_r^2 + u_i^2) - i_i)],
-                        [u_r, u_i], [i_r, i_i],
-                        name=:load)
-    loadblock = substitute_algebraic_states(loadblock)
-    bus = BusBar(loadblock; name=:loadbus, autopromote=true)
+function PT1PLoad(;EMT=false, params...)
+    cs = Components.PT1CurrentSource()
+    cs = make_iparam(cs, :P_ref)
+    bus = BusBar(cs; name=:load, autopromote=true, EMT)
     bus = set_p(bus, params)
     ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
 end
 
 function SecondaryControlCS(; EMT=false, params...)
     cs = Components.PT1CurrentSource()
-    cs = set_p(cs; τ=0.01)
+    cs = set_p(cs; τ=0.001)
 
     pll = Components.ReducedPLL()
     pll = set_p(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)

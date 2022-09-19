@@ -49,16 +49,32 @@ function getstate(sol, t::Number, p, idx, state)
         u_r_ref = getstate(sol, t, p, idx, :u_r_ref)
         u_i_ref = getstate(sol, t, p, idx, :u_i_ref)
         return atan(u_i_ref, u_r_ref)
+    elseif state==:ωmeas
+        u_r, u_i = vstate[1:2]
+        dx = sol(t, Val{1})
+        gd = nd(dx, p, t, GetGD)
+        dvstate = collect(get_vertex(gd, idx))
+        u_r_dot, u_i_dot = dvstate[1:2]
+        return -(u_i*u_r_dot - u_r*u_i_dot)/(u_i^2 + u_r^2)
     elseif state==:Va
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[1]
     elseif state==:Vb
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[2]
     elseif state==:Vc
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[3]
+    elseif state==:ia
+        i_r, i_i = flowsum(get_dst_edges(gd, idx))
+        return (Tdqinv(2π*50*t)*[i_r, i_i])[1]
+    elseif state==:ib
+        i_r, i_i = flowsum(get_dst_edges(gd, idx))
+        return (Tdqinv(2π*50*t)*[i_r, i_i])[2]
+    elseif state==:ic
+        i_r, i_i = flowsum(get_dst_edges(gd, idx))
+        return (Tdqinv(2π*50*t)*[i_r, i_i])[3]
     elseif state==:Smeas
         u_r, u_i = vstate[1:2]
         i_r, i_i = flowsum(get_dst_edges(gd, idx))
-        return (u_r + im*u_i)*(i_r - im*i_i)
+        return (u_r + im*u_i)*(-i_r + im*i_i)
     elseif state==:Pmeas
         return real(getstate(sol, t, p, idx, :Smeas))
     elseif state==:Qmeas
@@ -71,8 +87,10 @@ end
 timeseries(sol, ts, idx::Int, state) = timeseries(sol, ts, nothing, idx, state)
 timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
 
+TS_DTMAX::Float64 = 0.01
+set_ts_dtmax(dt) = global TS_DTMAX=dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
-function timeseries(sol, p, idx::Int, state; dtmax=0.01)
+function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX)
     if p==nothing && sol.prob.p !==nothing
         p = sol.prob.p
         if p !== SciMLBase.NullParameters()
