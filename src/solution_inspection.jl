@@ -56,6 +56,13 @@ function getstate(sol, t::Number, p, idx, state)
         dvstate = collect(get_vertex(gd, idx))
         u_r_dot, u_i_dot = dvstate[1:2]
         return -(u_i*u_r_dot - u_r*u_i_dot)/(u_i^2 + u_r^2)
+    elseif state==:rocof
+        h = 0.005
+        t1 = t-h < sol.t[begin] ? t : t-h
+        t2 = t+h < sol.t[begin] ? t : t+h
+        ω1 = getstate(sol, t1, p, idx, :ωmeas)
+        ω2 = getstate(sol, t2, p, idx, :ωmeas)
+        return (ω2-ω1)/(t2-t1)
     elseif state==:Va
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[1]
     elseif state==:Vb
@@ -98,12 +105,22 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX)
         end
     end
 
-    ts = [sol.t[begin]]
-    for i in eachindex(sol.t)[begin+1:end]
-        while !isnothing(dtmax) && ts[end] + dtmax < sol.t[i]
-            push!(ts, ts[end]+dtmax)
+    ts = Float64[]
+    for i in eachindex(sol.t)
+        if isempty(ts) || ts[end] !== sol.t[i]
+            push!(ts, sol.t[i])
         end
-        push!(ts, sol.t[i])
+
+        if i<lastindex(sol.t)
+            tdiff = sol.t[i+1] - sol.t[i]
+            if tdiff > dtmax
+                nsteps = tdiff ÷ dtmax + 1
+                dt = tdiff/nsteps
+                for k in 1:nsteps-1
+                    push!(ts, ts[end] + dt)
+                end
+            end
+        end
     end
     timeseries(sol, ts, p, idx, state)
 end
