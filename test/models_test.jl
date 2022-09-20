@@ -77,12 +77,12 @@ Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
     xlims!(0.099, 0.16)
 end
 
-@testset "SecondaryControl_CS" begin
+@testset "SecondaryControlCS_PI" begin
     rmsedge = RMSPiLine(R=0,
                         L=3.30812854442344e-5,
                         C1=0.00012696,
                         C2=0.00012696)
-    second_ctrl = SecondaryControlCS(; EMT=false, Ki=5, Kp=0)
+    second_ctrl = SecondaryControlCS_PI(; EMT=false, Ki=5, Kp=0)
     ####
     #### First on slack
     ####
@@ -228,4 +228,28 @@ end
     allp = [vabc, pmeas1, pmeas2, qmeas2, Vplot, ωplot]
     plot(allp..., layout=(6,1), size=(1000,1500))
     xlims!(0.09, 0.13)
+end
+
+@testset "SecondaryControlCS_PT1" begin
+    rmsedge = RMSPiLine(R=0,
+                        L=3.30812854442344e-5,
+                        C1=0.00012696,
+                        C2=0.00012696)
+    second_ctrl = SecondaryControlCS_PT1(; EMT=false, τ_cs=0.001, τ=1.0)
+    second_ctrl.f.params
+    ####
+    #### First on slack
+    ####
+    slack = Slack()
+
+    g = complete_graph(2)
+    nd = network_dynamics([second_ctrl, slack], rmsedge, g)
+    uguess = u0guess(nd)
+    p = ([-1.0, 1.0], nothing) # node parameters and (empty) line parameters
+    tspan = (0.0, 10.0)
+    prob = ODEProblem(nd, uguess, tspan, p)
+    sol = solve(prob, Rodas4())
+    plot(sol)
+
+    plot(timeseries(sol, 2, :Pmeas))
 end

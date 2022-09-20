@@ -1,4 +1,4 @@
-export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS
+export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS_PI, SecondaryControlCS_PT1
 
 function RMSPiLine(; L, R, C1, C2)
     let ω=2π*50, L=L, R=R, C1=C1, C2=C2
@@ -65,7 +65,7 @@ function PT1PLoad(;EMT=false, params...)
     ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
 end
 
-function SecondaryControlCS(; EMT=false, params...)
+function SecondaryControlCS_PI(; EMT=false, params...)
     cs = Components.PT1CurrentSource()
     cs = set_p(cs; τ=0.001)
 
@@ -88,6 +88,19 @@ function SecondaryControlCS(; EMT=false, params...)
     pisrc = connect_system(pisrc)
 
     bus = BusBar(pisrc; autopromote=true, EMT)
+    bus = set_p(bus, params)
+    ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
+end
+
+function SecondaryControlCS_PT1(; EMT=false, params...)
+    cs = Components.PT1CurrentSource(;:P_ref=>:P_ref_int, :τ=>:τ_cs)
+
+    lpf = Components.LowPassFilter(;:output=>:P_ref_int, :input=>:P_ref)
+    lpf = make_iparam(lpf, :P_ref)
+
+    cs = @connect lpf.P_ref_int => cs.P_ref_int outputs=:remaining name=:cs
+
+    bus = BusBar(cs; autopromote=true, EMT)
     bus = set_p(bus, params)
     ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
 end
