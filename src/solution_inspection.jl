@@ -1,6 +1,7 @@
 using LinearAlgebra: norm
 using SciMLBase
-export blockstates, getstate, timeseries
+export blockstates, getstate, timeseries, meanseries
+export NADIR, ROCOF, needed_storage
 
 
 blockstates(sol, idx) = blockstates(sol.prob.f, idx)
@@ -91,8 +92,8 @@ function getstate(sol, t::Number, p, idx, state)
     end
 end
 
-timeseries(sol, ts, idx::Int, state) = timeseries(sol, ts, nothing, idx, state)
-timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
+_timeseries(sol, ts, idx::Int, state) = _timeseries(sol, ts, nothing, idx, state)
+_timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
 
 TS_DTMAX::Float64 = 0.01
 set_ts_dtmax(dt) = global TS_DTMAX=dt
@@ -122,5 +123,49 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX)
             end
         end
     end
-    timeseries(sol, ts, p, idx, state)
+    _timeseries(sol, ts, p, idx, state)
+end
+
+function meanseries(sol, idxs, state; dtmax=TS_DTMAX)
+    ts, x = timeseries(sol, idxs[begin], state; dtmax)
+    for i in idxs[begin+1:end]
+        _, xi = _timeseries(sol, ts, i, state)
+        x += xi
+    end
+    x = x/length(idxs)
+    return ts, x
+end
+
+function NADIR(sol, idx::Int)
+    _, ω = timeseries(sol, idx, :ωmeas, dtmax=0.01)
+    return argmax(abs, ω)
+end
+function NADIR(sol, idxs)
+    d = Dict{Any, Float64}(idxs .=> NADIR.(Ref(sol), idxs))
+    _, ωmean = meanseries(sol, idxs, :ωmeas; dtmax=0.01)
+    d[:mean] = argmax(abs, ωmean)
+    d
+end
+
+function ROCOF(sol, idx::Int)
+    _, rocof = timeseries(sol, idx, :rocof, dtmax=0.01)
+    return argmax(abs, rocof)
+end
+
+function ROCOF(sol, idxs)
+    d = Dict{Any, Float64}(idxs .=> ROCOF.(Ref(sol), idxs))
+    _, rocofmean = meanseries(sol, idxs, :rocof; dtmax=0.01)
+    d[:mean] = argmax(abs, rocofmean)
+    d
+end
+
+needed_storage(sol, idxs) = needed_storage.(Ref(sol), idxs)
+function needed_storage(sol, idx::Int)
+    node_p = sol.prob.p[1][idx]
+    psyms = EMTSim._getwrapper(sol.prob.f, idx).params
+    pidx = findfirst(isequal(:P_ref), psyms)
+
+    t, P = timeseries(sol, idx, :Pmeas)
+    Pover = P .- node_p[pidx]
+    sum(diff(t) .* Pover[1:end-1])
 end

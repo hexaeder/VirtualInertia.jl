@@ -96,9 +96,9 @@ function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax
     sol = solve(prob, Rodas4(), dtmax=0.01)
 end
 
-plotsym(sol::ODESolution, sym, nodes=1:NODES) = plotsym!(plot(), sol, sym, nodes)
-plotsym!(sol::ODESolution, sym, nodes=1:NODES) = plotsym!(Plots.current(), sol, sym, nodes)
-function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:NODES)
+plotsym(sol::ODESolution, sym, nodes=1:NODES; mean=false) = plotsym!(plot(), sol, sym, nodes; mean)
+plotsym!(sol::ODESolution, sym, nodes=1:NODES; mean=false) = plotsym!(Plots.current(), sol, sym, nodes; mean)
+function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:NODES; mean=false)
     function names(i)
         if i==1
             " @ secondary control"
@@ -108,26 +108,20 @@ function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:NODES)
             " @ conv$(i-2)"
         end
     end
-    for i in nodes
-        try
-            plot!(p, timeseries(sol, i, sym); label=string(sym)*names(i))
-        catch
-            @warn "Could not create timeseries for $sym on node $i. Skipped!"
+    if mean
+        plot!(p, meanseries(sol, nodes, sym); label=string(sym)*" mean")
+    else
+        for i in nodes
+            try
+                plot!(p, timeseries(sol, i, sym); label=string(sym)*names(i))
+            catch
+                @warn "Could not create timeseries for $sym on node $i. Skipped!"
+            end
         end
     end
     p
 end
 
-needed_storage(sol, idxs) = needed_storage.(Ref(sol), idxs)
-function needed_storage(sol, idx::Int)
-    node_p = sol.prob.p[1][idx]
-    psyms = EMTSim._getwrapper(sol.prob.f, idx).params
-    pidx = findfirst(isequal(:P_ref), psyms)
-
-    t, P = timeseries(sol, idx, :Pmeas)
-    Pover = P .- node_p[pidx]
-    sum(diff(t) .* Pover[1:end-1])
-end
 function powerloss(sol)
     t, P = timeseries(sol, 1, :Pmeas)
     tidx = findfirst(x->x ≥ 0.1, t)
@@ -266,3 +260,11 @@ for τ in [1.3, 0.1, 0.01, 0.001]
     plotsym!(p, sol, :ωmeas, 1)
 end
 current()
+
+plotsym(sol, :ωmeas, 3:NODES)
+plotsym!(sol, :ωmeas, 3:NODES, mean=true)
+NADIR(sol, 3:NODES)
+
+plotsym(sol, :rocof, 3:NODES)
+plotsym!(sol, :rocof, 3:NODES, mean=true)
+ROCOF(sol, 3:NODES)
