@@ -31,9 +31,9 @@ NODES = 5
 #=
 Topology
 ```
-                      conv
-                    3    N-1
-  second ctrl 1 o---o- ⋯ -o---o 2 load
+                           convverters
+                  load     3   4   N-1
+  second ctrl 1 o---o------o---o ⋯ -o
 ```
 =#
 
