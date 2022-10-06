@@ -3,6 +3,7 @@ using SciMLBase
 export blockstates, getstate, timeseries, meanseries
 export NADIR, ROCOF, needed_storage
 
+const TS_DTMAX = Ref(0.01)
 
 blockstates(sol, idx) = blockstates(sol.prob.f, idx)
 function blockstates(nd::ODEFunction, idx)
@@ -16,6 +17,7 @@ function _getwrapper(nd, idx)
     ndobj.unique_vertices![_group].f
 end
 
+@nospecialize
 getstate(sol, t::Number, idx, state) = getstate(sol, t, nothing, idx, state)
 function getstate(sol, t::Number, p, idx, state)
     nd = sol.prob.f
@@ -95,14 +97,13 @@ end
 _timeseries(sol, ts, idx::Int, state) = _timeseries(sol, ts, nothing, idx, state)
 _timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
 
-TS_DTMAX::Float64 = 0.01
-set_ts_dtmax(dt) = global TS_DTMAX=dt
+set_ts_dtmax(dt) = EMTSim.TS_DTMAX[] = dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
-function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX)
+function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX[])
     if p==nothing && sol.prob.p !==nothing
         p = sol.prob.p
         if p !== SciMLBase.NullParameters()
-            @warn "I am using the p from the problem $p to recover states. Be carefull, this might be wrong afer callbacks."
+            # @warn "I am using the p from the problem $p to recover states. Be carefull, this might be wrong afer callbacks."
         end
     end
 
@@ -126,7 +127,7 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX)
     _timeseries(sol, ts, p, idx, state)
 end
 
-function meanseries(sol, idxs, state; dtmax=TS_DTMAX)
+function meanseries(sol, idxs, state; dtmax=TS_DTMAX[])
     ts, x = timeseries(sol, idxs[begin], state; dtmax)
     for i in idxs[begin+1:end]
         _, xi = _timeseries(sol, ts, i, state)
@@ -169,3 +170,5 @@ function needed_storage(sol, idx::Int)
     Pover = P .- node_p[pidx]
     sum(diff(t) .* Pover[1:end-1])
 end
+
+@specialize
