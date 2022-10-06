@@ -1,3 +1,12 @@
+using EMTSim
+using BlockSystems
+using NetworkDynamics
+using Graphs
+using OrdinaryDiffEq
+using DiffEqCallbacks
+using SteadyStateDiffEq
+using Plots
+using Unitful
 #=
 # Experiment on virtual inertia
 =#
@@ -16,17 +25,6 @@ Rline = 0.354u"Ω" / Rbase       |> u"pu"
 Lline = 350e-6u"H" / Lbase      |> u"s"
 Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
-using EMTSim
-using BlockSystems
-using NetworkDynamics
-using Graphs
-using OrdinaryDiffEq
-using DiffEqCallbacks
-using SteadyStateDiffEq
-using Plots
-import CairoMakie
-using GraphMakie
-using Unitful
 
 NODES = 5
 
@@ -61,12 +59,7 @@ function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax
     conv.f.params # P_ref
     second_ctrl.f.params # P_ref
 
-    g = SimpleGraph(n)
-    add_edge!(g, 1, 3)
-    add_edge!(g, n, 2)
-    for i in 3:n-1
-        add_edge!(g, i, i+1)
-    end
+    g = path_graph(n)
 
     Nconv = n-2
 
@@ -96,6 +89,7 @@ function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax
     sol = solve(prob, Rodas4(), dtmax=0.01)
 end
 
+@nospecialize
 plotsym(sol::ODESolution, sym, nodes=1:NODES; mean=false) = plotsym!(plot(), sol, sym, nodes; mean)
 plotsym!(sol::ODESolution, sym, nodes=1:NODES; mean=false) = plotsym!(Plots.current(), sol, sym, nodes; mean)
 function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:NODES; mean=false)
@@ -130,6 +124,7 @@ function powerloss(sol)
     Punder = 0.1 .- P
     sum(diff(t) .* Punder[1:end-1])
 end
+@specialize
 
 # First we start with with very small values of τ_P and τ_Q (i.e. low invertia)
 sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=1.0, K_Q=1.0, τ_sec=0.8, tmax=5);
@@ -187,41 +182,24 @@ ploss
 
 
 #=
-K and τ simultaniously
-=#
-plts = Any[]
-for K in [0.5, 1.0, 1.5, 2.0]
-    innerplts = Any[]
-    for τ in [0.2, 0.1, 0.01]
-        τ = M*K
-        sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-        # p = plotsym(sol, :Pmeas, [3:NODES...])
-        title!(p,"K=$K  τ = $τ")
-        push!(innerplts, p)
-    end
-    push!(plts, plot(innerplts..., layout=(1,:)))
-end
-plot(plts..., layout=(:,1), size=(1600,1000))
-
-#=
 Keep rocof constant?
 =#
 plts = Any[]
-for K in [0.5, 1.0, 1.5, 2.0]
+@time for K in [0.5, 1.0, 1.5, 2.0]
     innerplts = Any[]
     for M in [0.1, 0.2, 0.3]
         τ = M*K
         sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-        p = plotsym(sol, :rocof, [3:NODES...])
-        # p = plotsym(sol, :ωmeas, [3:NODES...])
+        # p = plotsym(sol, :rocof, [3:NODES...])
 
-        # t, ωmean = timeseries(sol, 3, :ωmeas)
-        # for i in 4:NODES
-        #     _, ω = timeseries(sol, i, :ωmeas)
-        #     ωmean += ω
-        # end
-        # ωmean = ωmean / (NODES-2)
-        # plot!(t, ωmean, width=5)
+        p = plotsym(sol, :ωmeas, [3:NODES...])
+        t, ωmean = timeseries(sol, 3, :ωmeas)
+        for i in 4:NODES
+            _, ω = timeseries(sol, i, :ωmeas)
+            ωmean += ω
+        end
+        ωmean = ωmean / (NODES-2)
+        plot!(t, ωmean, width=5)
 
         title!(p,"K=$K  M=$M  τ=$τ")
         push!(innerplts, p)
@@ -231,40 +209,61 @@ end
 plot(plts..., layout=(:,1), size=(1600,1000))
 
 #=
-Theoretical value for storage needs (what is lost until secondary control kicks in)
+Surface plot
 =#
-int = Any[]
-for τ in [1.3, 0.1, 0.01, 0.001]
-    K=0.8
-    sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, Ki_sec=1, Kp_sec=0, tmax=10.0);
-    t, P = timeseries(sol, 1, :Pmeas)
-    Pover = 0.5 .- P
-    fidx = findfirst(x->x>0.1, t)
-    t = t[fidx:end]
-    Pover = Pover[fidx:end]
-    push!(int,  sum(diff(t) .* Pover[1:end-1]))
+using GLMakie
+
+Mrange = collect(LinRange(0.1, 0.3, 5))
+Krange = collect(LinRange(0.5, 2.0, 5))
+rocofs = Array{Float64}(undef, length(Mrange), length(Krange))
+nadirs = similar(rocofs)
+
+@time @showprogress for (x, M) in enumerate(Mrange)
+    for (y, K) in enumerate(Krange)
+        τ = M*K
+        sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
+        # p = plotsym(sol, :rocof, [3:NODES...])
+        rocofs[x,y] = ROCOF(sol, 3)
+        nadirs[x,y] = NADIR(sol, 3)
+    end
 end
 
-p = plot(legend=:bottomright)
-for τ in [1.3, 0.1, 0.01, 0.001]
-    K=0.8
-    sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, Ki_sec=1, Kp_sec=0, tmax=20.0);
-    plotsym!(p, sol, :Pmeas, 1)
+Makie.surface(Mrange, Krange, rocofs, axis=(type=Axis3,ylabel="Droop K", xlabel="virtual mass", zlabel="rocof"))
+Makie.surface(Mrange, Krange, nadirs, axis=(type=Axis3,ylabel="Droop K", xlabel="virtual mass", zlabel="nadir"))
+
+
+#=
+surface plots are no good
+=#
+
+Mrange = collect(LinRange(0.1, 0.3, 10))
+Krange = collect(LinRange(0.5, 2.0, 5))
+p1 = plot(; xlabel="M", ylabel="rocof")
+p2 = plot(; xlabel="M", ylabel="nadir")
+for K in Krange
+    # K = 0.5
+    rocofs = Float64[]
+    rocoflow = similar(rocofs)
+    rocofhi = similar(rocofs)
+    nadirs = similar(rocofs)
+    nadirlow = similar(rocofs)
+    nadirhi = similar(rocofs)
+    @showprogress for M in Mrange
+        τ = M*K
+        sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
+        # p = plotsym(sol, :rocof, [3:NODES...])
+        roc = ROCOF(sol, 3:NODES)
+        nad = NADIR(sol, 3:NODES)
+        push!(rocofs, roc[3])
+        push!(nadirs, nad[3])
+        min, max = extrema(values(roc))
+        push!(rocoflow, abs(min - roc[3]))
+        push!(rocofhi, abs(max - roc[3]))
+
+        min, max = extrema(values(nad))
+        push!(nadirlow, abs(min - nad[3]))
+        push!(nadirhi, abs(max - nad[3]))
+    end
+    Plots.plot!(p1, Mrange, rocofs)#; ribbon=(rocoflow, rocofhi))
+    Plots.plot!(p2, Mrange, nadirs; ribbon=(nadirlow, nadirhi))
 end
-current()
-
-p = plot(legend=:bottomright)
-for τ in [1.3, 0.1, 0.01, 0.001]
-    K=0.8
-    sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, Ki_sec=1, Kp_sec=0, tmax=20.0);
-    plotsym!(p, sol, :ωmeas, 1)
-end
-current()
-
-plotsym(sol, :ωmeas, 3:NODES)
-plotsym!(sol, :ωmeas, 3:NODES, mean=true)
-NADIR(sol, 3:NODES)
-
-plotsym(sol, :rocof, 3:NODES)
-plotsym!(sol, :rocof, 3:NODES, mean=true)
-ROCOF(sol, 3:NODES)

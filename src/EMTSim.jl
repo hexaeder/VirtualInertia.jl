@@ -45,7 +45,9 @@ function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
     cl = ClosedLoop(inner, outer)
     open_p = ModelingToolkit.getname.(cl.iparams)
     if isempty(p_order) && !isempty(open_p)
-        @warn "Model has open parameters $open_p. ODEVertex will use that order. You may specify manuallly using the `p_order` kw."
+        if length(open_p) > 1
+            @warn "Model has open parameters $open_p. ODEVertex will use that order. You may specify manuallly using the `p_order` kw."
+        end
         p_order = open_p
     end
     ODEVertex(cl, p_order)
@@ -60,7 +62,6 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_states=[iob.u_r, iob.u_i],
                                    f_inputs=[iob.i_r, iob.i_i],
                                    f_params=p_order,
-                                   warn=true,
                                    type=:ode)
         f = CallableBlockWrapper(gen)
     elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
@@ -69,7 +70,6 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_states=[iob.u_r, iob.u_i],
                                    f_inputs=[],
                                    f_params=p_order,
-                                   warn=true,
                                    type=:ode)
         f = CallableBlockWrapper(gen)
     else
