@@ -253,3 +253,76 @@ end
 
     plot(timeseries(sol, 2, :Pmeas))
 end
+
+@testest "Synchronverter on slack" begin
+    slack = Slack();
+    syncv = ODEVertex(EMTSim.PT1Source(τ=0.001),
+                      EMTSim.Synchronverter(P_ref=1, Q_ref=0.1,
+                                            V_ref=1,
+                                            J=0.02, Dp=0.1, Dq=10.1, Kv=1,
+                                            ω0=ustrip(ω0)));
+
+    rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
+    g = complete_graph(2)
+    nd = network_dynamics([slack, syncv], rmsedge, g)
+    uguess = u0guess(nd)
+    prob = ODEProblem(nd, uguess, (0, 5))
+    sol = solve(prob, Rodas4());
+
+    plot(timeseries(sol, 2, :ω)...)
+    plot(timeseries(sol, 2, :MfIf)...)
+
+    plot(timeseries(sol, 2, :Pmeas)...)
+    plot(timeseries(sol, 2, :Qmeas)...)
+
+    plot(timeseries(sol, 2, :Vmag)...)
+    plot(timeseries(sol, 2, :Varg)...)
+
+    plot(timeseries(sol, 2, :Vmag_ref)...)
+    plot(timeseries(sol, 2, :Varg_ref)...)
+end
+
+@testest "Synchronverter on load with chagne" begin
+    # load = ConstPLoad()
+    load = PT1PLoad(τ=0.001);
+    @test load.f.params == [:P_ref]
+
+    syncv = ODEVertex(EMTSim.PT1Source(τ=0.001),
+                      EMTSim.Synchronverter(Q_ref=0,
+                                            V_ref=1,
+                                            J=0.02, Dp=0.1, Dq=1.0, Kv=1,
+                                            ω0=ustrip(ω0)));
+    @test syncv.f.params == [:P_ref]
+
+    rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
+
+    g = complete_graph(2)
+    nd = network_dynamics([load, syncv], rmsedge, g)
+    uguess = u0guess(nd)
+    p = ([-1.0, 1.0], nothing) # node parameters and (empty) line parameters
+    ssprob = SteadyStateProblem(nd, uguess, p)
+    u0 = solve(ssprob, DynamicSS(Rodas4()))
+
+    #=
+    To test the inverer response, we need to add a callback to the system which increases
+    the load at a certain point.
+    =#
+    function affect(integrator)
+        integrator.p = ([-1.1, 1.0], nothing)
+        auto_dt_reset!(integrator)
+    end
+    cb = PresetTimeCallback(0.1, affect)
+
+    tspan = (0.0, 2.)
+    prob = ODEProblem(nd, u0, tspan, p; callback=cb)
+    sol = solve(prob, Rodas4(), dtmax=0.1)
+
+    plot(timeseries(sol,1,:Pmeas); label="P_meas at load")
+    plot!(timeseries(sol,2,:Pmeas); label="P_meas at conv")
+
+    plot(timeseries(sol,2,:MfIf))
+    plot(timeseries(sol,2,:Te))
+    plot(timeseries(sol,2,:Q))
+
+    ωplot = plot(timeseries(sol,2,:ω); label="ω at conv")
+end

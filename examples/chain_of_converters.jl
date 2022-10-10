@@ -7,6 +7,8 @@ using DiffEqCallbacks
 using SteadyStateDiffEq
 using Plots
 using Unitful
+using Memoize
+using ProgressMeter
 #=
 # Experiment on virtual inertia
 =#
@@ -25,7 +27,6 @@ Rline = 0.354u"Ω" / Rbase       |> u"pu"
 Lline = 350e-6u"H" / Lbase      |> u"s"
 Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
-
 NODES = 5
 
 #=
@@ -37,7 +38,7 @@ Topology
 ```
 =#
 
-function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax=5, τ_load=0.001, n=NODES)
+@memoize SerializeDict function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax=5, τ_load=0.001, n=NODES)
     # lossless RMS Pi Model Line
     rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
 
@@ -126,9 +127,13 @@ function powerloss(sol)
 end
 @specialize
 
+# Toggle warnings in block systems
+BlockSystems.WARN[] = false
+
 # First we start with with very small values of τ_P and τ_Q (i.e. low invertia)
 sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=1.0, K_Q=1.0, τ_sec=0.8, tmax=5);
-p = plotsym(sol, :Pmeas)
+@time timeseries(sol,1,:Pmeas);
+@time plotsym(sol, :Pmeas)
 
 # lets have a look at different values for the droop term K
 # EMTSim.TS_DTMAX 0.0005
@@ -136,8 +141,8 @@ EMTSim.set_ts_dtmax(0.0005)
 plts = Any[]
 storage = Vector{Float64}[]
 ploss = Float64[]
-τ = 0.05
-for K in [0.5, 1.0, 1.5, 2.0]
+τ = 0.06
+@time for K in [0.5, 1.0, 1.5, 2.0]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
     # ylims!(0.95,1.45)
@@ -151,6 +156,7 @@ for K in [0.5, 1.0, 1.5, 2.0]
     push!(ploss, powerloss(sol))
 end
 plot(plts..., layout=(:,1), size=(1600,1000))
+
 storage
 ploss
 ((sum.(storage) .- ploss)./ploss)*100
@@ -161,7 +167,7 @@ For a fixed K, look at different τ
 plts = Any[]
 storage = Vector{Float64}[]
 ploss = Float64[]
-K = 2.0
+K = 1.0
 for τ in [1.0, 0.1, 0.01, 0.001]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
@@ -180,6 +186,7 @@ storage
 ploss
 ((sum.(storage) .- ploss)./ploss)*100
 
+xlims!(0,1)
 
 #=
 Keep rocof constant?
@@ -235,19 +242,20 @@ Makie.surface(Mrange, Krange, nadirs, axis=(type=Axis3,ylabel="Droop K", xlabel=
 #=
 surface plots are no good
 =#
+using DataFrames
+
+results = DataFrame()
 
 Mrange = collect(LinRange(0.1, 0.3, 10))
 Krange = collect(LinRange(0.5, 2.0, 5))
-p1 = plot(; xlabel="M", ylabel="rocof")
-p2 = plot(; xlabel="M", ylabel="nadir")
 for K in Krange
     # K = 0.5
-    rocofs = Float64[]
-    rocoflow = similar(rocofs)
-    rocofhi = similar(rocofs)
-    nadirs = similar(rocofs)
-    nadirlow = similar(rocofs)
-    nadirhi = similar(rocofs)
+    # rocofs = Float64[]
+    # rocoflow = similar(rocofs)
+    # rocofhi = similar(rocofs)
+    # nadirs = similar(rocofs)
+    # nadirlow = similar(rocofs)
+    # nadirhi = similar(rocofs)
     @showprogress for M in Mrange
         τ = M*K
         sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
@@ -267,3 +275,50 @@ for K in Krange
     Plots.plot!(p1, Mrange, rocofs)#; ribbon=(rocoflow, rocofhi))
     Plots.plot!(p2, Mrange, nadirs; ribbon=(nadirlow, nadirhi))
 end
+
+
+p1 = plot(; xlabel="M", ylabel="rocof")
+p2 = plot(; xlabel="M", ylabel="nadir")
+
+
+using DataFrames
+
+df = DataFrame()
+Mrange = collect(LinRange(0.1, 0.3, 10))
+Krange = collect(LinRange(0.5, 2.0, 5))
+@showprogress for K in Krange, M in Mrange
+    τ = M*K
+    sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
+    # p = plotsym(sol, :rocof, [3:NODES...])
+    for N in 3:NODES
+        rocof = ROCOF(sol, N)
+        nadir = NADIR(sol, N)
+        imax = maximum(timeseries(sol, N, :imag)[2])
+        push!(df, (; K, M, τ, N, rocof, nadir, imax))
+    end
+end
+
+gdf = groupby(df, [:K, :M, :τ])
+
+cmb = combine(gdf,
+              AsTable([:rocof, :N]) => (x->DataFrame(x)[x.N .== 3, :rocof]) => :rocof,
+              AsTable([:imax, :N]) => (x->DataFrame(x)[x.N .== 3, :imax]) => :imax,
+              AsTable([:nadir, :N]) => (x->DataFrame(x)[x.N .== 3, :nadir]) => :nadir,
+              :rocof => (x->minimum(abs.(x))) => :rocof_min,
+              :rocof => (x->maximum(abs.(x))) => :rocof_max,
+              :nadir => (x->minimum(abs.(x))) => :nadir_min,
+              :nadir => (x->maximum(abs.(x))) => :nadir_max,
+              :imax => (x->minimum(abs.(x))) => :imax_min,
+              :imax => (x->maximum(abs.(x))) => :imax_max)
+
+p1 = plot(title="ROCOF over M")
+p2 = plot(title="nadir over M")
+p3 = plot(title="imax over M")
+for i in sort(unique(cmb[!,:K]))
+    dfl = cmb[cmb[!,:K] .== i, :]
+    plot!(p1, dfl.M, dfl.rocof; label="K = $i")
+          # ribbon=(dfl.rocof_min-abs.(dfl.rocof), dfl.rocof_max-abs.(dfl.rocof)))
+    plot!(p2, dfl.M, dfl.nadir; label="K = $i")
+    plot!(p3, dfl.M, dfl.imax,;label="K = $i")
+end
+plot(p1,p2,p3; layout=(:,1), size=(1000,1000))

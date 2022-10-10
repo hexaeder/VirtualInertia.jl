@@ -171,4 +171,13 @@ function needed_storage(sol, idx::Int)
     sum(diff(t) .* Pover[1:end-1])
 end
 
+function powerloss(sol)
+    t, P = timeseries(sol, 1, :Pmeas)
+    tidx = findfirst(x->x ≥ 0.1, t)
+    t = t[tidx:end]
+    P = P[tidx:end]
+    Punder = 0.1 .- P
+    sum(diff(t) .* Punder[1:end-1])
+end
+
 @specialize

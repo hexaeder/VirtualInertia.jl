@@ -12,12 +12,18 @@ function ClosedLoop(inner, outer)
     @assert BlockSpec([:i_i, :i_r, :u_r_ref, :u_i_ref], [:u_r, :u_i])(inner) "Inner ctrl loop does not meet expectation."
     @assert BlockSpec([], [:u_r_ref, :u_i_ref]; in_strict=false)(outer)  "Outer ctrl loop does not meet expectation."
 
+    outerinputs = ModelingToolkit.getname.(outer.inputs)
+    :u_r ∈ outerinputs && @error "Outer shoud use :u_r_meas instead of :u_r"
+    :u_i ∈ outerinputs && @error "Outer shoud use :u_i_meas instead of :u_i"
+    :i_r ∈ outerinputs && @error "Outer shoud use :i_r_meas instead of :i_r"
+    :i_i ∈ outerinputs && @error "Outer shoud use :i_i_meas instead of :i_i"
+
     sys = IOSystem(:autocon, [outer, inner];
                    name=Symbol(string(outer.name)*"_"*string(inner.name)),
                    outputs=:remaining)
     closed = connect_system(sys)
 
-    @assert BlockSpec([:i_i, :i_r], [:u_r, :u_i])(closed) "Closed loop does not match expectation!"
+    @assert BlockSpec([:i_i, :i_r], [:u_r, :u_i])(closed) "Closed loop does not match expectation! $closed"
 
     return closed
 end
@@ -218,5 +224,6 @@ include("innerloop.jl")
 include("outerloop.jl")
 include("models.jl")
 include("solution_inspection.jl")
+include("SerializeDict.jl")
 
 end

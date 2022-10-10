@@ -108,6 +108,8 @@ function u0guess(s::Symbol)
         1.0
     elseif occursin(r"^A", s)
         1.0
+    elseif occursin(r"^MfIf", s)
+        sqrt(2/3) * 1/(2π*50)
     else
         0.0
     end
