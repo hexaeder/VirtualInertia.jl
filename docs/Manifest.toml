@@ -2,7 +2,7 @@
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "bc5f375a36942e77f7893f196599b491a7af5a8a"
+project_hash = "d86ff73bfb3086323397180aaeed30a53e79fa7d"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -879,6 +879,12 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
+[[deps.JLD2]]
+deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "Printf", "Reexport", "TranscodingStreams", "UUIDs"]
+git-tree-sha1 = "1c3ff7416cb727ebf4bab0491a56a296d7b8cf1d"
+uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+version = "0.4.25"
+
 [[deps.JLFzf]]
 deps = ["Pipe", "REPL", "Random", "fzf_jll"]
 git-tree-sha1 = "f377670cda23b6b7c1c0b3893e37451c5c1a2185"
@@ -1207,6 +1213,12 @@ deps = ["ColorTypes", "FileIO", "GeometryBasics", "Printf"]
 git-tree-sha1 = "8be09d84a2d597c7c0c34d7d604c039c9763e48c"
 uuid = "7269a6da-0436-5bbc-96c2-40638cbb6118"
 version = "0.4.10"
+
+[[deps.MetaGraphs]]
+deps = ["Graphs", "JLD2", "Random"]
+git-tree-sha1 = "2af69ff3c024d13bde52b34a2a7d6887d4e7b438"
+uuid = "626554b9-1ddb-594c-aa3c-2596fe9399a5"
+version = "0.7.1"
 
 [[deps.Metatheory]]
 deps = ["AutoHashEquals", "DataStructures", "Dates", "DocStringExtensions", "Parameters", "Reexport", "TermInterface", "ThreadsX", "TimerOutputs"]
@@ -2047,7 +2059,7 @@ uuid = "19fa3120-7c27-5ec5-8db8-b0b0aa330d6f"
 version = "0.2.0"
 
 [[deps.VirtualInertia]]
-deps = ["BlockSystems", "CSV", "CairoMakie", "ControlSystems", "DataFrames", "DiffEqCallbacks", "GLMakie", "GraphMakie", "Graphs", "LinearAlgebra", "Memoize", "ModelingToolkit", "NetworkDynamics", "OrdinaryDiffEq", "ProgressMeter", "Random", "SciMLBase", "Serialization", "SteadyStateDiffEq", "Unitful"]
+deps = ["BlockSystems", "CSV", "CairoMakie", "ControlSystems", "DataFrames", "DiffEqCallbacks", "GLMakie", "GraphMakie", "Graphs", "LinearAlgebra", "Memoize", "MetaGraphs", "ModelingToolkit", "NetworkDynamics", "OrdinaryDiffEq", "ProgressMeter", "Random", "SciMLBase", "Serialization", "SteadyStateDiffEq", "Unitful"]
 path = "/Users/hw/.julia/dev/VirtualInertia"
 uuid = "0f06b04d-b43d-419c-90b2-577bf047e135"
 version = "0.1.0"

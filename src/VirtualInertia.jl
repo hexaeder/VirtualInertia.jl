@@ -225,5 +225,6 @@ include("outerloop.jl")
 include("models.jl")
 include("solution_inspection.jl")
 include("SerializeDict.jl")
+include("import_network.jl")
 
 end
