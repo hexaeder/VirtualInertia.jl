@@ -1,5 +1,5 @@
 using Test
-using EMTSim
+using VirtualInertia
 using BlockSystems
 using Plots
 using OrdinaryDiffEq
@@ -7,6 +7,7 @@ using SteadyStateDiffEq
 using NetworkDynamics
 using Graphs
 using DiffEqCallbacks
+using Unitful
 
 ## This parameter set was used in a small EMT experiment with
 ω0    = 2π*50u"rad/s"
@@ -22,11 +23,11 @@ Rline = 0.354u"Ω" / Rbase       |> u"pu"
 Lline = 350e-6u"H" / Lbase      |> u"s"
 Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
-@testest "Doop Control test on step load" begin
+@testset "Doop Control test on step load" begin
     load = ConstPLoad()
     @test load.f.params == [:P_ref]
-    droopPT1 = ODEVertex(EMTSim.PT1Source(τ=0.001),
-                         EMTSim.DroopControl(Q_ref=0,
+    droopPT1 = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
+                         VirtualInertia.DroopControl(Q_ref=0,
                                              V_ref=1, ω_ref=0,
                                              τ_P=0.01, K_P=0.1,
                                              τ_Q=0.01, K_Q=0.1))
@@ -56,7 +57,7 @@ Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
     sol = solve(prob, Rodas4(), dtmax=0.1)
 
 
-    EMTSim.set_ts_dtmax(0.0005)
+    VirtualInertia.set_ts_dtmax(0.0005)
     pmeas1 = plot(timeseries(sol,1,:P_meas); label="P_meas at load")
     pmeas2 = plot(timeseries(sol,2,:P_meas); label="P_meas at conv")
     plot!(pmeas2, timeseries(sol,2,:P_fil); label="P_fil at conv")
@@ -100,8 +101,8 @@ end
     ####
     #### Then on droop controller
     ####
-    droopPT1 = ODEVertex(EMTSim.PT1Source(τ=0.001),
-                         EMTSim.DroopControl(Q_ref=0,
+    droopPT1 = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
+                         VirtualInertia.DroopControl(Q_ref=0,
                                              V_ref=1, ω_ref=0,
                                              τ_P=0.01, K_P=0.1,
                                              τ_Q=0.01, K_Q=0.1))
@@ -147,18 +148,15 @@ end
     plot!(timeseries(sol, 2, :Pmeas), label="Pmeas @ secondary control")
 
     plot(timeseries(sol, 1, :ω_pll), label="ω_pll @ secondary control")
-    plot(twinx(),timeseries(sol, 1, :P_ref_pi), label="Pref @ secondary control")
+    plot!(twinx(),timeseries(sol, 1, :P_ref_pi), label="Pref @ secondary control")
 end
 
-@testest "PT1 Load" begin
+@testset "PT1 Load" begin
     rmsload = PT1PLoad()
     rmsload.f.params
 
     emtload = PT1PLoad(EMT=true)
     emtload.f.params
-
-    old = EMTSim.PT1PLoadEMT()
-    old.f.params
 end
 
 @testset "EMT: Droop on EMT PT1 load" begin
@@ -166,8 +164,8 @@ end
                     C=ustrip(u"s", Cline)/2,
                     τ=1/(2π*50))
 
-    droopPT1 = ODEVertex(EMTSim.PT1Source(;τ=0.001),
-                         EMTSim.DroopControl(Q_ref=0,
+    droopPT1 = ODEVertex(VirtualInertia.PT1Source(;τ=0.001),
+                         VirtualInertia.DroopControl(Q_ref=0,
                                              V_ref=1, ω_ref=0,
                                              τ_P=0.01, K_P=0.1,
                                              τ_Q=0.01, K_Q=0.1))
@@ -211,7 +209,7 @@ end
 
     ωplot = plot(timeseries(sol,2,:ω); label="ω at conv")
 
-    set_ts_dtmax(0.00001)
+    VirtualInertia.set_ts_dtmax(0.00001)
     # vabc = plot(timeseries(sol,1,:Va); label="Va at conv")
     # plot!(timeseries(sol,1,:Vb); label="Vb")
     # plot!(timeseries(sol,1,:Vc); label="Vc")
@@ -254,10 +252,10 @@ end
     plot(timeseries(sol, 2, :Pmeas))
 end
 
-@testest "Synchronverter on slack" begin
+@testset "Synchronverter on slack" begin
     slack = Slack();
-    syncv = ODEVertex(EMTSim.PT1Source(τ=0.001),
-                      EMTSim.Synchronverter(P_ref=1, Q_ref=0.1,
+    syncv = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
+                      VirtualInertia.Synchronverter(P_ref=1, Q_ref=0.1,
                                             V_ref=1,
                                             J=0.02, Dp=0.1, Dq=10.1, Kv=1,
                                             ω0=ustrip(ω0)));
@@ -282,13 +280,13 @@ end
     plot(timeseries(sol, 2, :Varg_ref)...)
 end
 
-@testest "Synchronverter on load with chagne" begin
+@testset "Synchronverter on load with chagne" begin
     # load = ConstPLoad()
     load = PT1PLoad(τ=0.001);
     @test load.f.params == [:P_ref]
 
-    syncv = ODEVertex(EMTSim.PT1Source(τ=0.001),
-                      EMTSim.Synchronverter(Q_ref=0,
+    syncv = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
+                      VirtualInertia.Synchronverter(Q_ref=0,
                                             V_ref=1,
                                             J=0.02, Dp=0.1, Dq=1.0, Kv=1,
                                             ω0=ustrip(ω0)));

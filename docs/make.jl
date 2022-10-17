@@ -1,8 +1,8 @@
-using EMTSim
+using VirtualInertia
 using Documenter
 using Literate
 
-DocMeta.setdocmeta!(EMTSim, :DocTestSetup, :(using EMTSim); recursive=true)
+DocMeta.setdocmeta!(VirtualInertia, :DocTestSetup, :(using VirtualInertia); recursive=true)
 
 # generate examples
 example_dir = abspath(joinpath(@__DIR__, "..", "examples"))
@@ -23,13 +23,13 @@ for example in examples
 end
 
 makedocs(;
-    modules=[EMTSim],
+    modules=[VirtualInertia],
     authors="Hans Würfel <git@wuerfel.io> and contributors",
-    repo="https://github.com/hexaeder/EMTSim.jl/blob/{commit}{path}#{line}",
-    sitename="EMTSim.jl",
+    repo="https://github.com/hexaeder/VirtualInertia.jl/blob/{commit}{path}#{line}",
+    sitename="VirtualInertia.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://hexaeder.github.io/EMTSim.jl",
+        canonical="https://hexaeder.github.io/VirtualInertia.jl",
         assets=String[],
     ),
     pages=[
@@ -39,6 +39,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/hexaeder/EMTSim.jl",
+    repo="github.com/hexaeder/VirtualInertia.jl",
     devbranch="main",
 )

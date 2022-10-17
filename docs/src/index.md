@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = EMTSim
+CurrentModule = VirtualInertia
 ```
 
-# EMTSim
+# VirtualInertia
 
-Documentation for [EMTSim](https://github.com/hexaeder/EMTSim.jl).
+Documentation for [VirtualInertia](https://github.com/hexaeder/VirtualInertia.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [EMTSim]
+Modules = [VirtualInertia]
 ```

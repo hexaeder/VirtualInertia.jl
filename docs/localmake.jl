@@ -11,7 +11,11 @@ using LiveServer
 
 run = true
 while run
-    include("make.jl")
+    try
+        include("make.jl")
+    catch e
+        @warn "There was an error during `make.jl`" e
+    end
 
     println("Run again? Enter! Exit with 'q'.")
     if readline() == "q"

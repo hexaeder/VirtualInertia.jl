@@ -1,4 +1,4 @@
-using EMTSim
+using VirtualInertia
 using BlockSystems
 using NetworkDynamics
 using Graphs
@@ -6,8 +6,6 @@ using OrdinaryDiffEq
 using DiffEqCallbacks
 using SteadyStateDiffEq
 using Plots
-# import CairoMakie
-# using GraphMakie
 using Unitful
 
 #=
@@ -43,19 +41,19 @@ Topology
 ```
 =#
 function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax=5, τ_load=0.001)
-    # lossless RMS Pi Model Line
+    ## lossless RMS Pi Model Line
     rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
 
-    # conv1 = ODEVertex(EMTSim.PT1Source(;τ=0.001),
-    conv1 = ODEVertex(EMTSim.PerfectSource(),
-                      EMTSim.DroopControl(;Q_ref=0,
+    ## conv1 = ODEVertex(VirtualInertia.PT1Source(;τ=0.001),
+    conv1 = ODEVertex(VirtualInertia.PerfectSource(),
+                      VirtualInertia.DroopControl(;Q_ref=0,
                                           V_ref=1, ω_ref=0,
                                           τ_P, K_P,
                                           τ_Q, K_Q))
 
-    # conv2 = ODEVertex(EMTSim.PT1Source(;τ=0.001),
-    conv2 = ODEVertex(EMTSim.PerfectSource(),
-                      EMTSim.DroopControl(;Q_ref=0,
+    ## conv2 = ODEVertex(VirtualInertia.PT1Source(;τ=0.001),
+    conv2 = ODEVertex(VirtualInertia.PerfectSource(),
+                      VirtualInertia.DroopControl(;Q_ref=0,
                                           V_ref=1, ω_ref=0,
                                           τ_P, K_P,
                                           τ_Q, K_Q))
@@ -64,15 +62,15 @@ function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax
 
     load = PT1PLoad(;τ=τ_load)
 
-    # make sure that we defined all parameters but P_ref for all of the nodes
+    ## make sure that we defined all parameters but P_ref for all of the nodes
     load.f.params # P_ref
     conv1.f.params # P_ref
     conv2.f.params # P_ref
     second_ctrl.f.params # P_ref
 
-    # g = PathGraph(4)
-    # add_edge!(g, 4, 1)
-    # add_edge!(g, 1, 3)
+    ## g = PathGraph(4)
+    ## add_edge!(g, 4, 1)
+    ## add_edge!(g, 1, 3)
     g = SimpleGraph(4)
     add_edge!(g, 1, 3)
     add_edge!(g, 3, 4)
@@ -123,12 +121,12 @@ sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax=5);
 p = plotsym(sol, :Pmeas, [1,3,4])
 
 # lets have a look at different values for the droop term K
-EMTSim.set_ts_dtmax(0.0005)
+VirtualInertia.set_ts_dtmax(0.0005)
 plts = Any[]
 for K in [0.1, 0.8, 1.2]
     sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=K, K_Q=K, τ_sec=1, tmax=3);
     p1 = plotsym(sol, :Pmeas, [3,4,1])
-    # ylims!(0.95,1.45)
+    ## ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3,4])
     p3 = plotsym(sol, :ωmeas, [1,3,4])
     xlims!(p3, 0.09, 0.2)
@@ -149,9 +147,9 @@ K = 0.8
 for τ in [1.3, 0.1, 0.01, 0.001]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=12.5);
     p1 = plotsym(sol, :Pmeas, [3,4])
-    # ylims!(0.95,1.45)
+    ## ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3,4])
-    # ylims!(0.7,0.95)
+    ## ylims!(0.7,0.95)
     p3 = plotsym(sol, :ωmeas, [3,4])
     xlims!(p3, 0.09, 0.2)
     title!(p1, "τ = $τ")

@@ -2,9 +2,9 @@ using Unitful
 
 # define perunit as unit
 @unit pu "p.u." PerUnit 1 false
-Unitful.register(EMTSim)
+Unitful.register(VirtualInertia)
 function __init__()
-    Unitful.register(EMTSim)
+    Unitful.register(VirtualInertia)
 end
 
 """
@@ -49,55 +49,6 @@ function fixdiv(A)
         end
     end
     A = BlockSystems.narrow_type(A)
-end
-
-export ctrb, obsv
-function ctrb(A, B)
-    N, N2 = size(A)
-    @assert N==N2
-    C = B
-    for i in 1:N-1
-        C = hcat(C, (A^i) * B)
-    end
-    return C
-end
-
-function obsv(A, C)
-    N, N2 = size(A)
-    @assert N==N2
-    O = C
-    for i in 1:N-1
-        O = vcat(O, C * (A^i))
-    end
-    return O
-end
-
-export @labelled
-macro labelled(ex)
-    qn = _find_quot_node(ex)
-    isnothing(qn) && error("Did not find symbol.")
-
-    if Meta.isexpr(ex, :call)
-        pushfirst!(ex.args, ex.args[begin])
-        ex.args[2] = Expr(:parameters, Expr(:kw, :label, :(string($qn))))
-    else
-        error("Malformed expresseion")
-    end
-    esc(ex)
-end
-
-function _find_quot_node(ex)
-    if ex isa QuoteNode
-        return ex
-    elseif ex isa Expr
-        for arg in ex.args
-            node = _find_quot_node(arg)
-            if node isa QuoteNode
-                return node
-            end
-        end
-    end
-    return nothing
 end
 
 export u0guess

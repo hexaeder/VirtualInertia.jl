@@ -97,7 +97,7 @@ end
 _timeseries(sol, ts, idx::Int, state) = _timeseries(sol, ts, nothing, idx, state)
 _timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
 
-set_ts_dtmax(dt) = EMTSim.TS_DTMAX[] = dt
+set_ts_dtmax(dt) = VirtualInertia.TS_DTMAX[] = dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
 function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX[])
     if p==nothing && sol.prob.p !==nothing
@@ -163,7 +163,7 @@ end
 needed_storage(sol, idxs) = needed_storage.(Ref(sol), idxs)
 function needed_storage(sol, idx::Int)
     node_p = sol.prob.p[1][idx]
-    psyms = EMTSim._getwrapper(sol.prob.f, idx).params
+    psyms = VirtualInertia._getwrapper(sol.prob.f, idx).params
     pidx = findfirst(isequal(:P_ref), psyms)
 
     t, P = timeseries(sol, idx, :Pmeas)

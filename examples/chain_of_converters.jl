@@ -1,4 +1,4 @@
-using EMTSim
+using VirtualInertia
 using BlockSystems
 using NetworkDynamics
 using Graphs
@@ -39,23 +39,23 @@ Topology
 =#
 
 @memoize SerializeDict function solvesystem(;τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0, τ_sec=1, tmax=5, τ_load=0.001, n=NODES)
-    # lossless RMS Pi Model Line
+    ## lossless RMS Pi Model Line
     rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
 
-    # conv = ODEVertex(EMTSim.PT1Source(;τ=0.001),
-    conv = ODEVertex(EMTSim.PerfectSource(),
-                     EMTSim.DroopControl(;Q_ref=0,
+    ## conv = ODEVertex(VirtualInertia.PT1Source(;τ=0.001),
+    conv = ODEVertex(VirtualInertia.PerfectSource(),
+                     VirtualInertia.DroopControl(;Q_ref=0,
                                          V_ref=1, ω_ref=0,
                                          τ_P, K_P,
                                          τ_Q, K_Q))
 
-    # second_ctrl = SecondaryControlCS_PI(; EMT=false, Ki=Ki_sec, Kp=Kp_sec)
+    ## second_ctrl = SecondaryControlCS_PI(; EMT=false, Ki=Ki_sec, Kp=Kp_sec)
     second_ctrl = SecondaryControlCS_PT1(; EMT=false, τ_cs=τ_load, τ=τ_sec)
     second_ctrl.f.params
 
     load = PT1PLoad(;τ=τ_load)
 
-    # make sure that we defined all parameters but P_ref for all of the nodes
+    ## make sure that we defined all parameters but P_ref for all of the nodes
     load.f.params # P_ref
     conv.f.params # P_ref
     second_ctrl.f.params # P_ref
@@ -127,7 +127,7 @@ function powerloss(sol)
 end
 @specialize
 
-# Toggle warnings in block systems
+## Toggle warnings in block systems
 BlockSystems.WARN[] = false
 
 # First we start with with very small values of τ_P and τ_Q (i.e. low invertia)
@@ -136,8 +136,8 @@ sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=1.0, K_Q=1.0, τ_sec=0.8, tmax=5);
 @time plotsym(sol, :Pmeas)
 
 # lets have a look at different values for the droop term K
-# EMTSim.TS_DTMAX 0.0005
-EMTSim.set_ts_dtmax(0.0005)
+
+VirtualInertia.set_ts_dtmax(0.0005)
 plts = Any[]
 storage = Vector{Float64}[]
 ploss = Float64[]
@@ -145,7 +145,7 @@ ploss = Float64[]
 @time for K in [0.5, 1.0, 1.5, 2.0]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
-    # ylims!(0.95,1.45)
+    ## ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, 3:NODES)
     p3 = plotsym(sol, :ωmeas, [3:NODES...,1])
     xlims!(p3, 0.09, 0.2)
@@ -171,11 +171,11 @@ K = 1.0
 for τ in [1.0, 0.1, 0.01, 0.001]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
-    # ylims!(0.95,1.45)
+    ## ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3:NODES...])
-    # ylims!(0.7,0.95)
+    ## ylims!(0.7,0.95)
     p3 = plotsym(sol, :ωmeas, [3:NODES...])
-    # xlims!(p3, 0.09, 0.2)
+    ## xlims!(p3, 0.09, 0.2)
     title!(p1, "τ = $τ")
     push!(plts, plot(p1, p2, p3, layout=(1,:)))
     push!(storage, needed_storage(sol, 3:NODES))
@@ -197,7 +197,7 @@ plts = Any[]
     for M in [0.1, 0.2, 0.3]
         τ = M*K
         sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-        # p = plotsym(sol, :rocof, [3:NODES...])
+        ## p = plotsym(sol, :rocof, [3:NODES...])
 
         p = plotsym(sol, :ωmeas, [3:NODES...])
         t, ωmean = timeseries(sol, 3, :ωmeas)
@@ -229,7 +229,7 @@ nadirs = similar(rocofs)
     for (y, K) in enumerate(Krange)
         τ = M*K
         sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-        # p = plotsym(sol, :rocof, [3:NODES...])
+        ## p = plotsym(sol, :rocof, [3:NODES...])
         rocofs[x,y] = ROCOF(sol, 3)
         nadirs[x,y] = NADIR(sol, 3)
     end
@@ -249,17 +249,17 @@ results = DataFrame()
 Mrange = collect(LinRange(0.1, 0.3, 10))
 Krange = collect(LinRange(0.5, 2.0, 5))
 for K in Krange
-    # K = 0.5
-    # rocofs = Float64[]
-    # rocoflow = similar(rocofs)
-    # rocofhi = similar(rocofs)
-    # nadirs = similar(rocofs)
-    # nadirlow = similar(rocofs)
-    # nadirhi = similar(rocofs)
+    ## K = 0.5
+    ## rocofs = Float64[]
+    ## rocoflow = similar(rocofs)
+    ## rocofhi = similar(rocofs)
+    ## nadirs = similar(rocofs)
+    ## nadirlow = similar(rocofs)
+    ## nadirhi = similar(rocofs)
     @showprogress for M in Mrange
         τ = M*K
         sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-        # p = plotsym(sol, :rocof, [3:NODES...])
+        ## p = plotsym(sol, :rocof, [3:NODES...])
         roc = ROCOF(sol, 3:NODES)
         nad = NADIR(sol, 3:NODES)
         push!(rocofs, roc[3])
@@ -289,7 +289,7 @@ Krange = collect(LinRange(0.5, 2.0, 5))
 @showprogress for K in Krange, M in Mrange
     τ = M*K
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=2);
-    # p = plotsym(sol, :rocof, [3:NODES...])
+    ## p = plotsym(sol, :rocof, [3:NODES...])
     for N in 3:NODES
         rocof = ROCOF(sol, N)
         nadir = NADIR(sol, N)
@@ -317,7 +317,7 @@ p3 = plot(title="imax over M")
 for i in sort(unique(cmb[!,:K]))
     dfl = cmb[cmb[!,:K] .== i, :]
     plot!(p1, dfl.M, dfl.rocof; label="K = $i")
-          # ribbon=(dfl.rocof_min-abs.(dfl.rocof), dfl.rocof_max-abs.(dfl.rocof)))
+    ## ribbon=(dfl.rocof_min-abs.(dfl.rocof), dfl.rocof_max-abs.(dfl.rocof)))
     plot!(p2, dfl.M, dfl.nadir; label="K = $i")
     plot!(p3, dfl.M, dfl.imax,;label="K = $i")
 end

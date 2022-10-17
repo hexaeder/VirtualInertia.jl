@@ -1,10 +1,12 @@
 using Test
-using EMTSim
+using VirtualInertia
 using BlockSystems
 using Plots
 using OrdinaryDiffEq
+import Random
 
 @testset "ReducedPLL" begin
+    rng = Random.MersenneTwister(1)
     pll = Components.ReducedPLL()
     pll = set_p(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
 
@@ -16,7 +18,7 @@ using OrdinaryDiffEq
     blk = set_input(blk, :arg => 0)
 
     f = ODEFunction(blk)
-    u0 = rand(length(f.syms))
+    u0 = rand(rng, length(f.syms))
     tspan = (0,10)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
@@ -27,10 +29,9 @@ using OrdinaryDiffEq
     # test that frequency is near zero
     @test sol[end][2] < 1e-4
 
-
     # more complicated test
     pll = Components.ReducedPLL()
-    pll = set_p(pll; ω_lp=1.32 * 2π*50, Ki=20.0, Kp=2.0)
+    pll = set_p(pll; ω_lp=1.32 * 2π*50, Ki=20.0, Kp=3.0)
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
     blk = set_input(blk, :mag => 1.0)
@@ -53,8 +54,9 @@ using OrdinaryDiffEq
 end
 
 @testset "KauraPLL" begin
+    rng = Random.MersenneTwister(1)
     pll = Components.KauraPLL()
-    pll = set_p(pll; ω_lp=500, Kp=20, Ki=2)
+    pll = set_p(pll; ω_lp=500, Kp=20, Ki=3)
 
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
@@ -64,7 +66,8 @@ end
     blk = set_input(blk, :arg => 0)
 
     f = ODEFunction(blk)
-    u0 = rand(length(f.syms))
+    u0 = rand(rng, length(f.syms))
+    u0[5] = 0
     tspan = (0,10)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
@@ -74,7 +77,6 @@ end
     @test abs(rem(sol[end][1], π)) < 0.01
     # test that frequency is near zero
     @test sol[end][2] < 1e-4
-
 
     # more complicated test
     pll = Components.KauraPLL()
@@ -101,7 +103,7 @@ end
     plot!(t->0.1*sin(0.5*t); label="input arg")
 end
 
-@testest "PT1CurrentSource" begin
+@testset "PT1CurrentSource" begin
     cs = Components.PT1CurrentSource()
 
     p2c = Components.Polar2Cart()
