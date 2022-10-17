@@ -2,6 +2,7 @@ using VirtualInertia
 using MetaGraphs
 using BlockSystems
 using Unitful
+using NetworkDynamics
 
 network = import_system(:rtsgmlc)
 nodes = describe_nodes(network)
@@ -27,3 +28,13 @@ unique(describe_nodes(network).type)
 nodes = describe_nodes(network)
 nodes[nodes.type .== :syncon, :]
 nodes[nodes.type .== :load, :]
+
+skipmissing(nodes.P_inj) |> collect
+
+
+inv = Inverter(VirtualInertia.PerfectSource(),
+         VirtualInertia.DroopControl(;V_ref=1, ω_ref=0,
+                                     τ_P=0.9e-6, τ_Q=0.9e-6, K_P=1.0, K_Q=1.0))
+inv = Inverter(VirtualInertia.PerfectSource(), VirtualInertia.DroopControl())
+
+ODEVertex(inv_load, [:P_ref, :Q_ref, :P_load, :Q_load])
