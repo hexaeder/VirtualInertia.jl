@@ -2,7 +2,7 @@
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "d86ff73bfb3086323397180aaeed30a53e79fa7d"
+project_hash = "2dcc7c0186d61a5af1ac5e09bcd9754ec7b55e49"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -2059,7 +2059,7 @@ uuid = "19fa3120-7c27-5ec5-8db8-b0b0aa330d6f"
 version = "0.2.0"
 
 [[deps.VirtualInertia]]
-deps = ["BlockSystems", "CSV", "CairoMakie", "ControlSystems", "DataFrames", "DiffEqCallbacks", "GLMakie", "GraphMakie", "Graphs", "LinearAlgebra", "Memoize", "MetaGraphs", "ModelingToolkit", "NetworkDynamics", "OrdinaryDiffEq", "ProgressMeter", "Random", "SciMLBase", "Serialization", "SteadyStateDiffEq", "Unitful"]
+deps = ["BlockSystems", "CSV", "CairoMakie", "ControlSystems", "DataFrames", "DiffEqCallbacks", "GLMakie", "GeometryBasics", "GraphMakie", "Graphs", "LinearAlgebra", "Memoize", "MetaGraphs", "Missings", "ModelingToolkit", "NetworkDynamics", "NetworkLayout", "OrdinaryDiffEq", "ProgressMeter", "Random", "SciMLBase", "Serialization", "SteadyStateDiffEq", "Unitful"]
 path = "/Users/hw/.julia/dev/VirtualInertia"
 uuid = "0f06b04d-b43d-419c-90b2-577bf047e135"
 version = "0.1.0"

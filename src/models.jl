@@ -1,4 +1,4 @@
-export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS_PI, SecondaryControlCS_PT1
+export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS_PI, SecondaryControlCS_PT1, BSPiLine
 
 function RMSPiLine(; L, R, C1, C2)
     let ω=2π*50, L=L, R=R, C1=C1, C2=C2
@@ -17,6 +17,23 @@ function RMSPiLine(; L, R, C1, C2)
         end
         StaticEdge(f=edgef, dim=4, coupling=:fiducial, sym=[:i_r_dst,:i_i_dst, :i_r_src, :i_i_src])
     end
+end
+
+function BSPiLine(; p_order=[], params...)
+    @variables t i_r_src(t) i_i_src(t) i_r_dst(t) i_i_dst(t)
+    @parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R L C ω0
+    lineblock = IOBlock([i_r_src ~ real( (u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_src + im*u_i_src)/(im*ω0*C/2)),
+                         i_i_src ~ imag( (u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_src + im*u_i_src)/(im*ω0*C/2)),
+                         i_r_dst ~ real(-(u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_dst + im*u_i_dst)/(im*ω0*C/2)),
+                         i_i_dst ~ imag(-(u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_dst + im*u_i_dst)/(im*ω0*C/2))],
+                        [u_r_src, u_i_src, u_r_dst, u_i_dst],
+                        [i_r_src, i_i_src, i_r_dst, i_i_dst];
+                        name=:PiLine)
+    lineblock = set_p(lineblock, params)
+    if Set(ModelingToolkit.getname.(lineblock.iparams)) != Set(p_order)
+        @warn "There are open parameters on this line: $(lineblock.iparams)"
+    end
+    StaticEdge(lineblock, p_order)
 end
 
 function EMTRLLine(; params...)

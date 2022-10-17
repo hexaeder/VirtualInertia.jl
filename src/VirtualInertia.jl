@@ -209,6 +209,35 @@ function _odeedge_symmetric(iob, p_order)
     ODEEdge(; f, dim=4, coupling=:fiducial, mass_matrix=gen.massm, sym)
 end
 
+function NetworkDynamics.StaticEdge(iob::IOBlock, p_order=[])
+    symspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+                        [:i_r, :i_i])
+    asymspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+                         [:i_r_src, :i_i_src, :i_r_dst, :i_i_dst])
+
+    if fulfills(iob, symspec)
+        error("asymetric edges not yet implementet")
+        return _staticedge_symmetric(iob::IOBlock, p_order)
+    elseif fulfills(iob, asymspec)
+        return _staticedge_asymmetric(iob::IOBlock, p_order)
+    else
+        error("Unsupportet input-output relation in edge block.")
+    end
+end
+
+function _staticedge_asymmetric(iob::IOBlock, p_order)
+    gen = generate_io_function(iob;
+                               f_states=[iob.i_r_src, iob.i_i_src,
+                                         iob.i_r_src, iob.i_i_src],
+                               f_inputs=[iob.u_r_src, iob.u_i_src,
+                                         iob.u_r_dst, iob.u_i_dst],
+                               f_params=p_order,
+                               warn=true,
+                               type=:static)
+    dim = length(gen.states)
+    StaticEdge(; f=gen.f_ip, dim, coupling=:fiducial, sym=[:i_r_dst,:i_i_dst, :i_r_src, :i_i_src])
+end
+
 function flowsum(edges)
     i_r, i_i = 0.0, 0.0
     for e in edges
