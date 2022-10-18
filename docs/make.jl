@@ -12,7 +12,8 @@ mkpath(outdir)
 
 @info "Create Markdown files from examples"
 
-examples = filter(contains(r".jl$"), readdir(example_dir))
+# examples = filter(contains(r".jl$"), readdir(example_dir))
+examples = []; # FIXME: right now the examples are way to big for GH actions
 exlinks = Pair{String,String}[]
 for example in examples
     path = joinpath(example_dir, example)

@@ -3,9 +3,9 @@ module VirtualInertia
 using NetworkDynamics
 using BlockSystems
 using ModelingToolkit
+using ModelingToolkit: getname
 
 include("utils.jl")
-
 
 struct CallableBlockWrapper{F,G}
     f_ip::F
@@ -39,7 +39,7 @@ function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
 end
 
 function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
-    @assert length(p_order) == length(iob.iparams) "Provide order of all iparams!"
+    @assert length(p_order) == length(iob.iparams) "Provide order of all iparams: $(getname.(iob.iparams))"
 
     if fulfills(iob, BlockSpec([:i_r, :i_i], [:u_r, :u_i]))
         # normal node
@@ -205,16 +205,25 @@ function NetworkDynamics.StaticEdge(iob::IOBlock, p_order=[])
 end
 
 function _staticedge_asymmetric(iob::IOBlock, p_order)
-    gen = generate_io_function(iob;
-                               f_states=[iob.i_r_src, iob.i_i_src,
-                                         iob.i_r_src, iob.i_i_src],
-                               f_inputs=[iob.u_r_src, iob.u_i_src,
-                                         iob.u_r_dst, iob.u_i_dst],
-                               f_params=p_order,
-                               warn=true,
-                               type=:static)
-    dim = length(gen.states)
-    StaticEdge(; f=gen.f_ip, dim, coupling=:fiducial, sym=[:i_r_dst,:i_i_dst, :i_r_src, :i_i_src])
+    let gen = generate_io_function(iob;
+                                   f_states=[iob.i_r_dst,
+                                             iob.i_i_dst,
+                                             iob.i_r_src,
+                                             iob.i_i_src],
+                                   f_inputs=[iob.u_r_src,
+                                             iob.u_i_src,
+                                             iob.u_r_dst,
+                                             iob.u_i_dst],
+                                   f_params=p_order,
+                                   warn=true,
+                                   type=:static)
+        f = function (u, src, dst, p, t)
+            gen.f_ip(u, (src[1], src[2], dst[1], dst[2]), p, t)
+        end
+        dim = length(gen.states)
+        @assert dim == 4
+        StaticEdge(; f, dim, coupling=:fiducial, sym=[:i_r_dst, :i_i_dst, :i_r_src, :i_i_src])
+    end
 end
 
 function flowsum(edges)

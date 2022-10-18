@@ -109,7 +109,7 @@ end
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => cs.(u_r, u_i) outputs=:remaining
 
-    blk = set_p(blk; τ=0.01, P_ref=1, mag=1)
+    blk = set_p(blk; τ=0.01, P=1, mag=1, Q=0)
 
     @variables t
     blk = set_input(blk, :arg => 0.5*(t>1))
@@ -120,4 +120,24 @@ end
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
     plot(sol)
+end
+
+@testset "PerfectCurrentSource" begin
+    cs = Components.PerfectCurrentSource()
+
+    gen = generate_io_function(cs; f_inputs=[:u_r, :u_i], f_states=[:i_r, :i_i], f_params=[:P, :Q]);
+
+    rng = Random.MersenneTwister(1)
+
+    for i in 1:100
+        u = randn(rng, 2)
+        S = randn(rng, 2)
+        i = gen.f_oop(u, S, nothing)
+        Scomp = Complex(u...) * conj(Complex(i...))
+
+        δP = S[1] .- real(Scomp)
+        δQ = S[2] .- imag(Scomp)
+        @test δP < 1e-10
+        @test δQ < 1e-10
+    end
 end

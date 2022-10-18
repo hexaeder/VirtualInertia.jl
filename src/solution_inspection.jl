@@ -180,4 +180,23 @@ function powerloss(sol)
     sum(diff(t) .* Punder[1:end-1])
 end
 
+export plotsym, plotsym!
+import Plots
+plotsym(sol::ODESolution, sym, nodes=1:nv(sol.prob.f.f.graph); mean=false) = plotsym!(Plots.plot(), sol, sym, nodes; mean)
+plotsym!(sol::ODESolution, sym, nodes=1:nv(sol.prob.f.f.graph); mean=false) = plotsym!(Plots.current(), sol, sym, nodes; mean)
+function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:nv(sol.prob.f.f.graph); mean=false)
+    if mean
+        Plots.plot!(p, meanseries(sol, nodes, sym); label=string(sym)*" mean")
+    else
+        for i in nodes
+            try
+                Plots.plot!(p, timeseries(sol, i, sym); label=string(sym)*string(i))
+            catch
+                @warn "Could not create timeseries for $sym on node $i. Skipped!"
+            end
+        end
+    end
+    p
+end
+
 @specialize

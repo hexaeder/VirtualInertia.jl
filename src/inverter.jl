@@ -1,6 +1,6 @@
-export Inverter, VSwithLoad
+export Inverter, VSwithLoad, DroopControl, Synchronverter, PerfectSource, PT1Source
 
-function Inverter(inner, outer)
+function Inverter(inner, outer; name=Symbol(string(outer.name)*"_"*string(inner.name)))
     @assert BlockSpec([:i_i, :i_r, :u_r_ref, :u_i_ref], [:u_r, :u_i])(inner) "Inner ctrl loop does not meet expectation."
     @assert BlockSpec([], [:u_r_ref, :u_i_ref]; in_strict=false)(outer)  "Outer ctrl loop does not meet expectation."
 
@@ -11,8 +11,8 @@ function Inverter(inner, outer)
     :i_i ∈ outerinputs && @error "Outer shoud use :i_i_meas instead of :i_i"
 
     sys = IOSystem(:autocon, [outer, inner];
-                   name=Symbol(string(outer.name)*"_"*string(inner.name)),
-                   outputs=:remaining)
+                   outputs=:remaining,
+                   name)
     closed = connect_system(sys)
 
     @assert BlockSpec([:i_i, :i_r], [:u_r, :u_i])(closed) "Closed loop does not match expectation! $closed"
@@ -20,24 +20,21 @@ function Inverter(inner, outer)
     return closed
 end
 
-function VSwithLoad(vs; params...)
+function VSwithLoad(vs; name=Symbol(string(vs.name)*"_w_load"), params...)
     @assert BlockSpec([:i_i, :i_r], [:u_r, :u_i])(vs) "Does not look like a voltage source: $closed"
+
+    pcs = Components.PerfectCurrentSource(; name=:load, P=:P_load, Q=:Q_load, i_i=:i_load_i, i_r=:i_load_r)
+
     @variables t i_int_r(t) i_int_i(t)
-    @parameters u_r(t) u_i(t) i_r(t) i_i(t) P Q
-    iint = IOBlock([i_int_r ~ i_r + (u_r*P + u_i*Q)/(P^2 + Q^2),
-                   i_int_i ~ i_i + (u_r*Q - u_i*P)/(P^2 + Q^2)],
-                  [i_r, i_i, u_r, u_i],
-                  [i_int_r, i_int_i],
-                  name=:i_int)
-    iint = rename_vars(iint; P=:P_load, Q=:Q_load)
-    sys = IOSystem([iint.i_int_r => vs.i_r,
-                    iint.i_int_i => vs.i_i,
-                    vs.u_r => iint.u_r,
-                    vs.u_i => iint.u_i], [iint, vs];
-                   namespace_map = [iint.i_r => :i_r, iint.i_i=>:i_i],
-                   outputs = [vs.u_r, vs.u_i])
+    @parameters i_r(t) i_i(t) i_load_r(t) i_load_i(t)
+    kirchhoff = IOBlock([i_int_r ~ i_r + i_load_r,
+                         i_int_i ~ i_i + i_load_i],
+                        [i_r, i_i, i_load_r, i_load_i], [i_int_r, i_int_i])
+
+    vs = replace_vars(vs; i_r=:i_int_r, i_i=:i_int_i)
+
+    sys = IOSystem(:autocon, [vs, pcs, kirchhoff]; outputs=[vs.u_r, vs.u_i], name)
     con = connect_system(sys)
-    return set_p(con, params)
 end
 
 ####
@@ -66,7 +63,7 @@ function DroopControl(; params...)
     @named droopctrl = IOSystem(:autocon, [PQmeas, Psys, Qsys, refgen], outputs=:remaining)
     con = connect_system(droopctrl)
 
-    return set_p(con, params)
+    return replace_vars(con, params)
 end
 
 function Synchronverter(; params...)
@@ -102,7 +99,7 @@ function Synchronverter(; params...)
 
     @named syncvert = IOSystem(:autocon, [floop, vloop, machine], outputs=:remaining, globalp=[:ω0])
     con = connect_system(syncvert)
-    return set_p(con, params)
+    return replace_vars(con, params)
 end
 
 ####
@@ -125,7 +122,7 @@ function PT1Source(; params...)
                                [u_r, u_i])
 
     if !isempty(params)
-        PT1source = set_p(PT1source, params)
+        PT1source = replace_vars(PT1source, params)
     end
 
     ui_meas = Components.UIMeas()

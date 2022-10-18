@@ -151,12 +151,29 @@ end
     plot!(twinx(),timeseries(sol, 1, :P_ref_pi), label="Pref @ secondary control")
 end
 
-@testset "PT1 Load" begin
-    rmsload = PT1PLoad()
-    rmsload.f.params
+@testset "PT1 and const Load" begin
+    slack = Slack()
+    # load = PT1Load(EMT=true, τ=0.01, C=1e-5, ω0=2π*50)
+    # load = ConstLoad(EMT=true, C=1e-5, ω0=2π*50)
+    load = ConstLoad()
+    load = PT1Load(τ=0.001)
+    loadv = ODEVertex(load,[:P_load, :Q_load])
 
-    emtload = PT1PLoad(EMT=true)
-    emtload.f.params
+    # line = RMSPiLine(R=0, L=3.3e-5, C1=1e-4, C2=1e-4)
+    # line = RMSPiLine(R=0, L=0.8/(2π*50), C1=1e-4/(2π*50), C2=1e-4/(2π*50))
+    line = BSPiLine(;R=0, X=0.8, B_src=0.05, B_dst=0.05) |> StaticEdge
+    # line = BSPiLine(;R=0, X=3.3e-5*(2π*50), B_src=1e-4*(2π*50), B_dst=1e-4*(2π*50)) |> StaticEdge
+
+    g = SimpleGraph(2)
+    add_edge!(g,1,2)
+    nd = network_dynamics([slack, loadv], line, g)
+    u0 = u0guess(nd)
+    p = ([(NaN,NaN), (-1.0, 0)] ,nothing)
+    prob = ODEProblem(nd, u0, (0,0.1), p)
+    @time sol = solve(prob, Rodas4());
+
+    plot(sol)
+
 end
 
 @testset "EMT: Droop on EMT PT1 load" begin

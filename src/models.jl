@@ -1,4 +1,4 @@
-export Slack, RMSPiLine, EMTRLLine, PT1PLoad, ConstPLoad, PT1PLoadEMT, SecondaryControlCS_PI, SecondaryControlCS_PT1, BSPiLine
+export Slack, RMSPiLine, EMTRLLine, PT1Load, ConstPLoad, PT1PLoadEMT, SecondaryControlCS_PI, SecondaryControlCS_PT1, BSPiLine, ConstLoad
 
 function RMSPiLine(; L, R, C1, C2)
     let ω=2π*50, L=L, R=R, C1=C1, C2=C2
@@ -21,19 +21,15 @@ end
 
 function BSPiLine(; p_order=[], params...)
     @variables t i_r_src(t) i_i_src(t) i_r_dst(t) i_i_dst(t)
-    @parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R L C ω0
-    lineblock = IOBlock([i_r_src ~ real( (u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_src + im*u_i_src)/(im*ω0*C/2)),
-                         i_i_src ~ imag( (u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_src + im*u_i_src)/(im*ω0*C/2)),
-                         i_r_dst ~ real(-(u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_dst + im*u_i_dst)/(im*ω0*C/2)),
-                         i_i_dst ~ imag(-(u_r_src + im*u_i_src - u_r_src + im*u_i_src)/(R + im*ω0*L) - (u_r_dst + im*u_i_dst)/(im*ω0*C/2))],
+    @parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R X B_src B_dst
+    lineblock = IOBlock([i_r_src ~ real(-(u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_src)*(u_r_src + im*u_i_src)),
+                         i_i_src ~ imag(-(u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_src)*(u_r_src + im*u_i_src)),
+                         i_r_dst ~ real( (u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_dst)*(u_r_dst + im*u_i_dst)),
+                         i_i_dst ~ imag( (u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_dst)*(u_r_dst + im*u_i_dst))],
                         [u_r_src, u_i_src, u_r_dst, u_i_dst],
                         [i_r_src, i_i_src, i_r_dst, i_i_dst];
                         name=:PiLine)
-    lineblock = set_p(lineblock, params)
-    if Set(ModelingToolkit.getname.(lineblock.iparams)) != Set(p_order)
-        @warn "There are open parameters on this line: $(lineblock.iparams)"
-    end
-    StaticEdge(lineblock, p_order)
+    lineblock = replace_vars(lineblock, params)
 end
 
 function EMTRLLine(; params...)
@@ -74,12 +70,16 @@ function ConstPLoad(;params...)
     ODEVertex(loadblock, ModelingToolkit.getname.(loadblock.iparams))
 end
 
-function PT1PLoad(;EMT=false, params...)
-    cs = Components.PT1CurrentSource()
-    cs = make_iparam(cs, :P_ref)
-    bus = BusBar(cs; name=:load, autopromote=true, EMT)
-    bus = set_p(bus, params)
-    ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
+function ConstLoad(;EMT=false, params...)
+    cs = Components.PerfectCurrentSource(;name=:load_cs, P=:P_load, Q=:Q_load)
+    bus = BusBar(cs; name=:pt1load, autopromote=true, EMT)
+    bus = replace_vars(bus, params)
+end
+
+function PT1Load(;EMT=false, params...)
+    cs = Components.PT1CurrentSource(;name=:load_cs, P=:P_load, Q=:Q_load)
+    bus = BusBar(cs; name=:pt1load, autopromote=true, EMT)
+    bus = replace_vars(bus, params)
 end
 
 function SecondaryControlCS_PI(; EMT=false, params...)

@@ -201,7 +201,7 @@ function KauraPLL(; name=:pll, renamings...)
     rename_vars(block; renamings...)
 end
 
-function PT1CurrentSource(; name=:CS, renamings...)
+function PT1CurrentSource_old(; name=:CS, renamings...)
     @variables t i_r(t) i_i(t)
     @parameters P_ref(t) τ u_r(t) u_i(t)
     dt = Differential(t)
@@ -209,7 +209,27 @@ function PT1CurrentSource(; name=:CS, renamings...)
                      dt(i_i) ~ 1/τ * (P_ref * u_i/(u_r^2 + u_i^2) - i_i)],
                     [u_r, u_i, P_ref], [i_r, i_i],
                     name=:CS)
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
+end
+
+function PT1CurrentSource(; name=:CS, renamings...)
+    lpf_r = Components.LowPassFilter(; input=:i_ref_r, output=:i_r)
+    lpf_i = Components.LowPassFilter(; input=:i_ref_i, output=:i_i)
+    pcs   = Components.PerfectCurrentSource(; i_r=:i_ref_r, i_i=:i_ref_i)
+
+    sys = IOSystem(:autocon, [lpf_r, lpf_i, pcs]; globalp=[:τ], outputs=:remaining, name)
+    block = connect_system(sys)
+    replace_vars(block; renamings...)
+end
+
+function PerfectCurrentSource(; name=:CS, renamings...)
+    @variables t i_r(t) i_i(t)
+    @parameters u_r(t) u_i(t) P Q
+    block = IOBlock([i_r ~ (P*u_r + Q*u_i)/(u_r^2 + u_i^2),
+                     i_i ~ (P*u_i - Q*u_r)/(u_r^2 + u_i^2)],
+                    [u_r, u_i], [i_r, i_i],
+                    name=:CS)
+    replace_vars(block; renamings...)
 end
 
 end # module
