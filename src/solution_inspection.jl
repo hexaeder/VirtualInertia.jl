@@ -1,5 +1,8 @@
 using LinearAlgebra: norm
 using SciMLBase
+import Makie
+import Makie.GeometryBasics: Point2
+import RecipesBase
 export blockstates, getstate, timeseries, meanseries
 export NADIR, ROCOF, needed_storage
 
@@ -135,8 +138,14 @@ function getstate(sol, t::Number, p, idx, state)
     end
 end
 
+struct TimeSeries
+    t::Vector{Float32}
+    x::Vector{Float32}
+    name::String
+end
+
 _timeseries(sol, ts, idx::Int, state) = _timeseries(sol, ts, nothing, idx, state)
-_timeseries(sol, ts, p, idx::Int, state) = (collect(ts), [getstate(sol, t, p, idx, state) for t in ts])
+_timeseries(sol, ts, p, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p, idx, state)) for t in ts], "$state @ $idx")
 
 set_ts_dtmax(dt) = VirtualInertia.TS_DTMAX[] = dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
@@ -148,7 +157,7 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX[])
         end
     end
 
-    ts = Float64[]
+    ts = Float32[]
     for i in eachindex(sol.t)
         if isempty(ts) || ts[end] !== sol.t[i]
             push!(ts, sol.t[i])
@@ -175,7 +184,7 @@ function meanseries(sol, idxs, state; dtmax=TS_DTMAX[])
         x += xi
     end
     x = x/length(idxs)
-    return ts, x
+    return Timeseries(ts, x, "$state mean")
 end
 
 function NADIR(sol, idx::Int)
@@ -231,7 +240,7 @@ function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:nv(sol.prob.f.f.
     else
         for i in nodes
             try
-                Plots.plot!(p, timeseries(sol, i, sym); label=string(sym)*string(i))
+                Plots.plot!(p, timeseries(sol, i, sym))
             catch
                 @warn "Could not create timeseries for $sym on node $i. Skipped!"
             end
@@ -241,3 +250,15 @@ function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:nv(sol.prob.f.f.
 end
 
 @specialize
+
+function Makie.convert_arguments(P::Makie.PointBased, ts::TimeSeries)
+    @show P
+    return (Point2f.(zip(ts.t, ts.x)),)
+end
+Makie.plottype(::TimeSeries) = Makie.Lines
+
+RecipesBase.@recipe function f(ts::TimeSeries)
+    seriestype  :=  :path
+    label   --> ts.name
+    (ts.t, ts.x)
+end

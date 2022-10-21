@@ -121,16 +121,6 @@ function affect(integrator)
 end
 cb = PresetTimeCallback(0.1, affect)
 
-tspan = (0, 100)
+tspan = (0, 0.25)
 prob = ODEProblem(nd, u0, tspan, params; callback=cb)
 sol = solve(prob, Rodas4());
-
-plotsym(sol, :ω, largest)
-plotsym(sol, :P_fil, largest)
-plotsym(sol, :Varg, largest)
-plotsym(sol, :δ, largest)
-
-Makie.plot(timeseries(sol, 1, :ω))
-#TODO why is the frequenccy not zero but the angle stabilizes?!
-
-Makie.plot(1:10000,y->sin(y))
