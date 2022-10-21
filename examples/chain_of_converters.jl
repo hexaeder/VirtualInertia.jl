@@ -5,7 +5,7 @@ using Graphs
 using OrdinaryDiffEq
 using DiffEqCallbacks
 using SteadyStateDiffEq
-using Plots
+import Plots
 using Unitful
 using Memoize
 using ProgressMeter
@@ -104,11 +104,11 @@ function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=1:NODES; mean=fals
         end
     end
     if mean
-        plot!(p, meanseries(sol, nodes, sym); label=string(sym)*" mean")
+        Plots.plot!(p, meanseries(sol, nodes, sym); label=string(sym)*" mean")
     else
         for i in nodes
             try
-                plot!(p, timeseries(sol, i, sym); label=string(sym)*names(i))
+                Plots.plot!(p, timeseries(sol, i, sym); label=string(sym)*names(i))
             catch
                 @warn "Could not create timeseries for $sym on node $i. Skipped!"
             end
@@ -145,13 +145,13 @@ ploss = Float64[]
 @time for K in [0.5, 1.0, 1.5, 2.0]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
-    ## ylims!(0.95,1.45)
+    ## Plots.ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, 3:NODES)
     p3 = plotsym(sol, :ωmeas, [3:NODES...,1])
-    xlims!(p3, 0.09, 0.2)
-    ylims!(p3, -0.12, 0.01)
+    Plots.xlims!(p3, 0.09, 0.2)
+    Plots.ylims!(p3, -0.12, 0.01)
     title!(p1, "K = $K")
-    push!(plts, plot(p1, p2, p3, layout=(1,:)))
+    push!(plts, Plots.plot(p1, p2, p3, layout=(1,:)))
     push!(storage, needed_storage(sol, 3:NODES))
     push!(ploss, powerloss(sol))
 end
@@ -171,13 +171,13 @@ K = 1.0
 for τ in [1.0, 0.1, 0.01, 0.001]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=4);
     p1 = plotsym(sol, :Pmeas, [3:NODES...])
-    ## ylims!(0.95,1.45)
+    ## Plots.ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3:NODES...])
-    ## ylims!(0.7,0.95)
+    ## Plots.ylims!(0.7,0.95)
     p3 = plotsym(sol, :ωmeas, [3:NODES...])
-    ## xlims!(p3, 0.09, 0.2)
+    ## Plots.xlims!(p3, 0.09, 0.2)
     title!(p1, "τ = $τ")
-    push!(plts, plot(p1, p2, p3, layout=(1,:)))
+    push!(plts, Plots.plot(p1, p2, p3, layout=(1,:)))
     push!(storage, needed_storage(sol, 3:NODES))
     push!(ploss, powerloss(sol))
 end
@@ -186,7 +186,7 @@ storage
 ploss
 ((sum.(storage) .- ploss)./ploss)*100
 
-xlims!(0,1)
+Plots.xlims!(0,1)
 
 #=
 Keep rocof constant?
@@ -206,19 +206,19 @@ plts = Any[]
             ωmean += ω
         end
         ωmean = ωmean / (NODES-2)
-        plot!(t, ωmean, width=5)
+        Plots.plot!(t, ωmean, width=5)
 
         title!(p,"K=$K  M=$M  τ=$τ")
         push!(innerplts, p)
     end
-    push!(plts, plot(innerplts..., layout=(1,:)))
+    push!(plts, Plots.plot(innerplts..., layout=(1,:)))
 end
 plot(plts..., layout=(:,1), size=(1600,1000))
 
 #=
 Surface plot
 =#
-using GLMakie
+using GLMakie: Makie
 
 Mrange = collect(LinRange(0.1, 0.3, 5))
 Krange = collect(LinRange(0.5, 2.0, 5))
@@ -277,8 +277,8 @@ for K in Krange
 end
 
 
-p1 = plot(; xlabel="M", ylabel="rocof")
-p2 = plot(; xlabel="M", ylabel="nadir")
+p1 = Plots.plot(; xlabel="M", ylabel="rocof")
+p2 = Plots.plot(; xlabel="M", ylabel="nadir")
 
 
 using DataFrames
@@ -311,14 +311,14 @@ cmb = combine(gdf,
               :imax => (x->minimum(abs.(x))) => :imax_min,
               :imax => (x->maximum(abs.(x))) => :imax_max)
 
-p1 = plot(title="ROCOF over M")
-p2 = plot(title="nadir over M")
-p3 = plot(title="imax over M")
+p1 = Plots.plot(title="ROCOF over M")
+p2 = Plots.plot(title="nadir over M")
+p3 = Plots.plot(title="imax over M")
 for i in sort(unique(cmb[!,:K]))
     dfl = cmb[cmb[!,:K] .== i, :]
-    plot!(p1, dfl.M, dfl.rocof; label="K = $i")
+    Plots.plot!(p1, dfl.M, dfl.rocof; label="K = $i")
     ## ribbon=(dfl.rocof_min-abs.(dfl.rocof), dfl.rocof_max-abs.(dfl.rocof)))
-    plot!(p2, dfl.M, dfl.nadir; label="K = $i")
-    plot!(p3, dfl.M, dfl.imax,;label="K = $i")
+    Plots.plot!(p2, dfl.M, dfl.nadir; label="K = $i")
+    Plots.plot!(p3, dfl.M, dfl.imax,;label="K = $i")
 end
 plot(p1,p2,p3; layout=(:,1), size=(1000,1000))

@@ -45,20 +45,20 @@ function getstate(sol, t::Number, p, idx, state)
         input = flowsum(get_dst_edges(gd, idx))
         return atan(input[2], input[1])
     elseif state==:Vmag_ref
-        u_r_ref = getstate(sol, t, p, idx, :u_r_ref)
-        u_i_ref = getstate(sol, t, p, idx, :u_i_ref)
-        return norm([u_r_ref, u_i_ref])
+        u_ref_r = getstate(sol, t, p, idx, :u_ref_r)
+        u_ref_i = getstate(sol, t, p, idx, :u_ref_i)
+        return norm([u_ref_r, u_ref_i])
     elseif state==:Varg_ref
-        u_r_ref = getstate(sol, t, p, idx, :u_r_ref)
-        u_i_ref = getstate(sol, t, p, idx, :u_i_ref)
-        return atan(u_i_ref, u_r_ref)
+        u_ref_r = getstate(sol, t, p, idx, :u_ref_r)
+        u_ref_i = getstate(sol, t, p, idx, :u_ref_i)
+        return atan(u_ref_i, u_ref_r)
     elseif state==:ωmeas
         u_r, u_i = vstate[1:2]
         dx = sol(t, Val{1})
         gd = nd(dx, p, t, GetGD)
         dvstate = collect(get_vertex(gd, idx))
-        u_r_dot, u_i_dot = dvstate[1:2]
-        return -(u_i*u_r_dot - u_r*u_i_dot)/(u_i^2 + u_r^2)
+        u_dot_r, u_dot_i = dvstate[1:2]
+        return -(u_i*u_dot_r - u_r*u_dot_i)/(u_i^2 + u_r^2)
     elseif state==:rocof
         h = 0.005
         t1 = t-h < sol.t[begin] ? t : t-h

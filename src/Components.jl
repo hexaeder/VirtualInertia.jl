@@ -33,7 +33,7 @@ function LowPassFilter(;name=gensym(:lpf), renamings...)
 
     block = IOBlock([D(output) ~ 1/τ * (- output + input)],
                 [input], [output]; name)
-    return isempty(renamings) ? block : rename_vars(block; renamings...)
+    return isempty(renamings) ? block : replace_vars(block; renamings...)
 end
 
 """
@@ -63,7 +63,7 @@ function Droop(;name=gensym(:droop), renamings...)
     block = IOBlock([u ~ - K * (x - x_ref) + u_ref], # output is the droop voltage v
                     [x], [u]; name)
 
-    return isempty(renamings) ? block : rename_vars(block; renamings...)
+    return isempty(renamings) ? block : replace_vars(block; renamings...)
 end
 
 """
@@ -96,7 +96,7 @@ function Power(;name=gensym(:power), renamings...)
                      Q ~ u_i*i_r - u_r*i_i],
                     [u_i, u_r, i_i, i_r], [P, Q]; name)
 
-    return isempty(renamings) ? block : rename_vars(block; renamings...)
+    return isempty(renamings) ? block : replace_vars(block; renamings...)
 end
 
 """
@@ -111,7 +111,7 @@ function Cart2Polar(;name=:c2p, renamings...)
                      arg ~ atan(y, x)],
                     [x, y], [mag, arg]; name)
 
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 """
     Polar2Cart(;name=:p2c, renamings...)
@@ -125,7 +125,7 @@ function Polar2Cart(;name=:p2c, renamings...)
                      y ~ mag * sin(arg)],
                     [mag, arg], [x, y]; name)
 
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 
 """
@@ -134,16 +134,16 @@ end
 Create dq-reference from (ω, V) reference.
 """
 function VRefGen(; name=:Vrefgen, renamings...)
-    @variables t δ(t) u_r_ref(t) u_i_ref(t)
+    @variables t δ(t) u_ref_r(t) u_ref_i(t)
     @parameters V(t) ω(t)
     dt = Differential(t)
     block = IOBlock([dt(δ) ~ ω,
-                     u_r_ref ~ V*cos(δ),
-                     u_i_ref ~ V*sin(δ)],
+                     u_ref_r ~ V*cos(δ),
+                     u_ref_i ~ V*sin(δ)],
                     [V, ω],
-                    [u_r_ref, u_i_ref];
+                    [u_ref_r, u_ref_i];
                     name)
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 
 """
@@ -152,17 +152,17 @@ end
 Creates a very simple block which is mainly there for renaiming.
 """
 function UIMeas(; name=:ui_meas, renamings...)
-    @variables t u_r_meas(t) u_i_meas(t) i_r_meas(t) i_i_meas(t)
+    @variables t u_meas_r(t) u_meas_i(t) i_meas_r(t) i_meas_i(t)
     @parameters u_r(t) u_i(t) i_i(t) i_r(t)
-    block = IOBlock([u_r_meas ~ u_r,
-                     u_i_meas ~ u_i,
-                     i_r_meas ~ -i_r,
-                     i_i_meas ~ -i_i],
+    block = IOBlock([u_meas_r ~ u_r,
+                     u_meas_i ~ u_i,
+                     i_meas_r ~ -i_r,
+                     i_meas_i ~ -i_i],
                     [u_r, u_i, i_r, i_i],
-                    [u_r_meas, u_i_meas, i_r_meas, i_i_meas];
+                    [u_meas_r, u_meas_i, i_meas_r, i_meas_i];
                     name)
 
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 
 function ReducedPLL(; name=:pll, renamings...)
@@ -179,7 +179,7 @@ function ReducedPLL(; name=:pll, renamings...)
                     [δ_pll, ω_pll];
                     name)
     block = substitute_algebraic_states(block)
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 
 function KauraPLL(; name=:pll, renamings...)
@@ -198,7 +198,7 @@ function KauraPLL(; name=:pll, renamings...)
                     [δ_pll, ω_pll];
                     name)
     block = substitute_algebraic_states(block)
-    rename_vars(block; renamings...)
+    replace_vars(block; renamings...)
 end
 
 function PT1CurrentSource_old(; name=:CS, renamings...)

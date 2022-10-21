@@ -1,14 +1,14 @@
 using Test
 using VirtualInertia
 using BlockSystems
-using Plots
+import Plots
 using OrdinaryDiffEq
 import Random
 
 @testset "ReducedPLL" begin
     rng = Random.MersenneTwister(1)
     pll = Components.ReducedPLL()
-    pll = set_p(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
+    pll = replace_vars(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
 
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
@@ -22,7 +22,7 @@ import Random
     tspan = (0,10)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 
     # test that angle is close to n*π
     @test abs(rem(sol[end][1], π)) < 0.01
@@ -31,7 +31,7 @@ import Random
 
     # more complicated test
     pll = Components.ReducedPLL()
-    pll = set_p(pll; ω_lp=1.32 * 2π*50, Ki=20.0, Kp=3.0)
+    pll = replace_vars(pll; ω_lp=1.32 * 2π*50, Ki=20.0, Kp=3.0)
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
     blk = set_input(blk, :mag => 1.0)
@@ -45,18 +45,18 @@ import Random
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
 
-    plot(sol.t, sol[:ω_pll]; label="tracked freq")
-    plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
-    ylims!(-.1,.1)
+    Plots.plot(sol.t, sol[:ω_pll]; label="tracked freq")
+    Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
+    Plots.ylims!(-.1,.1)
 
-    plot(sol.t, sol[:δ_pll]; label="tracked arg")
-    plot!(t->0.1*sin(0.5*t); label="input arg")
+    Plots.plot(sol.t, sol[:δ_pll]; label="tracked arg")
+    Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
 end
 
 @testset "KauraPLL" begin
     rng = Random.MersenneTwister(1)
     pll = Components.KauraPLL()
-    pll = set_p(pll; ω_lp=500, Kp=20, Ki=3)
+    pll = replace_vars(pll; ω_lp=500, Kp=20, Ki=3)
 
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
@@ -71,7 +71,7 @@ end
     tspan = (0,10)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 
     # test that angle is close to n*π
     @test abs(rem(sol[end][1], π)) < 0.01
@@ -80,7 +80,7 @@ end
 
     # more complicated test
     pll = Components.KauraPLL()
-    pll = set_p(pll; ω_lp=500, Kp=20., Ki=2)
+    pll = replace_vars(pll; ω_lp=500, Kp=20., Ki=2)
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => pll.(u_r, u_i) outputs=:remaining
     blk = set_input(blk, :mag => 1.0)
@@ -95,12 +95,12 @@ end
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
 
-    plot(sol.t, sol[:ω_pll]; label="tracked freq")
-    plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
-    ylims!(-.1,.1)
+    Plots.plot(sol.t, sol[:ω_pll]; label="tracked freq")
+    Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
+    Plots.ylims!(-.1,.1)
 
-    plot(sol.t, sol[:δ_pll]; label="tracked arg")
-    plot!(t->0.1*sin(0.5*t); label="input arg")
+    Plots.plot(sol.t, sol[:δ_pll]; label="tracked arg")
+    Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
 end
 
 @testset "PT1CurrentSource" begin
@@ -109,7 +109,7 @@ end
     p2c = Components.Polar2Cart()
     blk = @connect p2c.(x,y) => cs.(u_r, u_i) outputs=:remaining
 
-    blk = set_p(blk; τ=0.01, P=1, mag=1, Q=0)
+    blk = replace_vars(blk; τ=0.01, P=1, mag=1, Q=0)
 
     @variables t
     blk = set_input(blk, :arg => 0.5*(t>1))
@@ -119,7 +119,7 @@ end
     tspan = (0,2)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 end
 
 @testset "PerfectCurrentSource" begin

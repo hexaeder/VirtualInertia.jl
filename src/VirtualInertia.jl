@@ -47,7 +47,8 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_states=[iob.u_r, iob.u_i],
                                    f_inputs=[iob.i_r, iob.i_i],
                                    f_params=p_order,
-                                   type=:ode)
+                                   type=:ode,
+                                   warn=false)
         f = CallableBlockWrapper(gen)
     elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
         # slack node does not need to know the flowsum
@@ -142,20 +143,20 @@ end
 """
 Conventions:
 (Anti-)symmetric lines:
-  - inputs:   `u_r_src`, `u_i_src`, `u_r_dst`, `u_i_dst`
+  - inputs:   `u_src_r`, `u_src_i`, `u_dst_r`, `u_dst_i`
   - outputs:  `i_r`, `i_i`
   - current direction is defined from src to dst
   - dst node will receive `-i_r`, `-i_i`
 Asymmetric lines:
-  - inputs:   `u_r_src`, `u_i_src`, `u_r_dst`, `u_i_dst`
-  - outputs:  `i_r_src`, `i_i_src`, `i_r_dst`, `i_i_dst`
+  - inputs:   `u_src_r`, `u_src_i`, `u_dst_r`, `u_dst_i`
+  - outputs:  `i_src_r`, `i_src_i`, `i_dst_r`, `i_dst_i`
   - not yet implemented. might by tricky with fidutial...
 """
 function NetworkDynamics.ODEEdge(iob::IOBlock, p_order=[])
-    symspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+    symspec = BlockSpec([:u_src_r, :u_src_i, :u_dst_r, :u_dst_i],
                         [:i_r, :i_i])
-    asymspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
-                         [:i_r_src, :i_i_src, :i_r_dst, :i_i_dst])
+    asymspec = BlockSpec([:u_src_r, :u_src_i, :u_dst_r, :u_dst_i],
+                         [:i_src_r, :i_src_i, :i_dst_r, :i_dst_i])
 
     if fulfills(iob, symspec)
         return _odeedge_symmetric(iob::IOBlock, p_order)
@@ -170,8 +171,8 @@ end
 function _odeedge_symmetric(iob, p_order)
     gen = generate_io_function(iob;
                                f_states=[iob.i_r, iob.i_i],
-                               f_inputs=[iob.u_r_src, iob.u_i_src,
-                                         iob.u_r_dst, iob.u_i_dst],
+                               f_inputs=[iob.u_src_r, iob.u_src_i,
+                                         iob.u_dst_r, iob.u_dst_i],
                                f_params=p_order,
                                warn=true,
                                type=:ode)
@@ -189,10 +190,10 @@ function _odeedge_symmetric(iob, p_order)
 end
 
 function NetworkDynamics.StaticEdge(iob::IOBlock, p_order=[])
-    symspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
+    symspec = BlockSpec([:u_src_r, :u_src_i, :u_dst_r, :u_dst_i],
                         [:i_r, :i_i])
-    asymspec = BlockSpec([:u_r_src, :u_i_src, :u_r_dst, :u_i_dst],
-                         [:i_r_src, :i_i_src, :i_r_dst, :i_i_dst])
+    asymspec = BlockSpec([:u_src_r, :u_src_i, :u_dst_r, :u_dst_i],
+                         [:i_src_r, :i_src_i, :i_dst_r, :i_dst_i])
 
     if fulfills(iob, symspec)
         error("asymetric edges not yet implementet")
@@ -206,14 +207,14 @@ end
 
 function _staticedge_asymmetric(iob::IOBlock, p_order)
     let gen = generate_io_function(iob;
-                                   f_states=[iob.i_r_dst,
-                                             iob.i_i_dst,
-                                             iob.i_r_src,
-                                             iob.i_i_src],
-                                   f_inputs=[iob.u_r_src,
-                                             iob.u_i_src,
-                                             iob.u_r_dst,
-                                             iob.u_i_dst],
+                                   f_states=[iob.i_dst_r,
+                                             iob.i_dst_i,
+                                             iob.i_src_r,
+                                             iob.i_src_i],
+                                   f_inputs=[iob.u_src_r,
+                                             iob.u_src_i,
+                                             iob.u_dst_r,
+                                             iob.u_dst_i],
                                    f_params=p_order,
                                    warn=true,
                                    type=:static)
@@ -222,7 +223,7 @@ function _staticedge_asymmetric(iob::IOBlock, p_order)
         end
         dim = length(gen.states)
         @assert dim == 4
-        StaticEdge(; f, dim, coupling=:fiducial, sym=[:i_r_dst, :i_i_dst, :i_r_src, :i_i_src])
+        StaticEdge(; f, dim, coupling=:fiducial, sym=[:i_dst_r, :i_dst_i, :i_src_r, :i_src_i])
     end
 end
 

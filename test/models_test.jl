@@ -1,7 +1,7 @@
 using Test
 using VirtualInertia
 using BlockSystems
-using Plots
+import Plots
 using OrdinaryDiffEq
 using SteadyStateDiffEq
 using NetworkDynamics
@@ -24,8 +24,7 @@ Lline = 350e-6u"H" / Lbase      |> u"s"
 Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
 @testset "Doop Control test on step load" begin
-    load = ConstPLoad()
-    @test load.f.params == [:P_ref]
+    load = ODEVertex(ConstPLoad(), [:P_ref])
     droopPT1 = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
                          VirtualInertia.DroopControl(Q_ref=0,
                                              V_ref=1, ω_ref=0,
@@ -58,24 +57,24 @@ Cline = 2*(12e-6)u"F" / Cbase   |> u"s"
 
 
     VirtualInertia.set_ts_dtmax(0.0005)
-    pmeas1 = plot(timeseries(sol,1,:P_meas); label="P_meas at load")
-    pmeas2 = plot(timeseries(sol,2,:P_meas); label="P_meas at conv")
-    plot!(pmeas2, timeseries(sol,2,:P_fil); label="P_fil at conv")
+    pmeas1 = Plots.plot(timeseries(sol,1,:P_meas); label="P_meas at load")
+    pmeas2 = Plots.plot(timeseries(sol,2,:P_meas); label="P_meas at conv")
+    Plots.plot!(pmeas2, timeseries(sol,2,:P_fil); label="P_fil at conv")
 
-    qmeas2 = plot(timeseries(sol,2,:Q_meas); label="Q_meas at conv")
-    plot!(qmeas2, timeseries(sol,2,:Q_fil); label="Q_fil at conv")
+    qmeas2 = Plots.plot(timeseries(sol,2,:Q_meas); label="Q_meas at conv")
+    Plots.plot!(qmeas2, timeseries(sol,2,:Q_fil); label="Q_fil at conv")
 
-    ωplot = plot(timeseries(sol,2,:ω); label="ω at conv")
-    vabc = plot(timeseries(sol,2,:Va); label="Va at conv")
-    plot!(timeseries(sol,2,:Vb); label="Vb")
-    plot!(timeseries(sol,2,:Vc); label="Vc")
+    ωplot = Plots.plot(timeseries(sol,2,:ω); label="ω at conv")
+    vabc = Plots.plot(timeseries(sol,2,:Va); label="Va at conv")
+    Plots.plot!(timeseries(sol,2,:Vb); label="Vb")
+    Plots.plot!(timeseries(sol,2,:Vc); label="Vc")
 
-    Vplot = plot(timeseries(sol,2,:Vmag); label="Vmag at conv")
-    plot!(Vplot, timeseries(sol,2,:Vmag_ref); label="Vmag setpoint")
+    Vplot = Plots.plot(timeseries(sol,2,:Vmag); label="Vmag at conv")
+    Plots.plot!(Vplot, timeseries(sol,2,:Vmag_ref); label="Vmag setpoint")
 
     allp = [vabc, pmeas1, pmeas2, qmeas2, Vplot, ωplot]
-    plot(allp..., layout=(6,1), size=(1000,1500))
-    xlims!(0.099, 0.16)
+    Plots.plot(allp..., layout=(6,1), size=(1000,1500))
+    Plots.xlims!(0.099, 0.16)
 end
 
 @testset "SecondaryControlCS_PI" begin
@@ -84,10 +83,12 @@ end
                         C1=0.00012696,
                         C2=0.00012696)
     second_ctrl = SecondaryControlCS_PI(; EMT=false, Ki=5, Kp=0)
+    second_ctrl = ODEVertex(second_ctrl, [:P_ref])
+
     ####
     #### First on slack
     ####
-    slack = Slack()
+    slack = ODEVertex(Slack())
 
     g = complete_graph(2)
     nd = network_dynamics([second_ctrl, slack], rmsedge, g)
@@ -96,7 +97,7 @@ end
     tspan = (0.0, 10.0)
     prob = ODEProblem(nd, uguess, tspan, p)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 
     ####
     #### Then on droop controller
@@ -105,7 +106,7 @@ end
                          VirtualInertia.DroopControl(Q_ref=0,
                                              V_ref=1, ω_ref=0,
                                              τ_P=0.01, K_P=0.1,
-                                             τ_Q=0.01, K_Q=0.1))
+                                             τ_Q=0.01, K_Q=0.1));
 
     g = complete_graph(2)
     nd = network_dynamics([second_ctrl, droopPT1], rmsedge, g)
@@ -116,13 +117,13 @@ end
     tspan = (0.0, 30.0)
     prob = ODEProblem(nd, uguess, tspan, p)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 
-    plot(timeseries(sol, 1, :Vmag), label="Vmag @ secondary control")
-    plot!(timeseries(sol, 2, :Vmag), label="Vmag @ droop")
+    Plots.plot(timeseries(sol, 1, :Vmag), label="Vmag @ secondary control")
+    Plots.plot!(timeseries(sol, 2, :Vmag), label="Vmag @ droop")
 
-    plot(timeseries(sol, 1, :Varg), label="Varg @ secondary control")
-    plot!(timeseries(sol, 2, :Varg), label="Varg @ droop")
+    Plots.plot(timeseries(sol, 1, :Varg), label="Varg @ secondary control")
+    Plots.plot!(timeseries(sol, 2, :Varg), label="Varg @ droop")
 
     u0 = sol[end]
 
@@ -138,21 +139,21 @@ end
     prob = ODEProblem(nd, u0, tspan, p; callback=cb)
     sol = solve(prob, Rodas4())
 
-    plot(timeseries(sol, 1, :Vmag), label="Vmag @ secondary control")
-    plot!(timeseries(sol, 2, :Vmag), label="Vmag @ droop")
+    Plots.plot(timeseries(sol, 1, :Vmag), label="Vmag @ secondary control")
+    Plots.plot!(timeseries(sol, 2, :Vmag), label="Vmag @ droop")
 
-    plot(timeseries(sol, 1, :Varg), label="Varg @ secondary control")
-    plot!(timeseries(sol, 2, :Varg), label="Varg @ droop")
+    Plots.plot(timeseries(sol, 1, :Varg), label="Varg @ secondary control")
+    Plots.plot!(timeseries(sol, 2, :Varg), label="Varg @ droop")
 
-    plot(timeseries(sol, 1, :Pmeas), label="Pmeas @ secondary control")
-    plot!(timeseries(sol, 2, :Pmeas), label="Pmeas @ secondary control")
+    Plots.plot(timeseries(sol, 1, :Pmeas), label="Pmeas @ secondary control")
+    Plots.plot!(timeseries(sol, 2, :Pmeas), label="Pmeas @ secondary control")
 
-    plot(timeseries(sol, 1, :ω_pll), label="ω_pll @ secondary control")
-    plot!(twinx(),timeseries(sol, 1, :P_ref_pi), label="Pref @ secondary control")
+    Plots.plot(timeseries(sol, 1, :ω_pll), label="ω_pll @ secondary control")
+    Plots.plot!(Plots.twinx(),timeseries(sol, 1, :P_ref_pi), label="Pref @ secondary control")
 end
 
 @testset "PT1 and const Load" begin
-    slack = Slack()
+    slack = ODEVertex(Slack())
     # load = PT1Load(EMT=true, τ=0.01, C=1e-5, ω0=2π*50)
     # load = ConstLoad(EMT=true, C=1e-5, ω0=2π*50)
     load = ConstLoad()
@@ -172,14 +173,15 @@ end
     prob = ODEProblem(nd, u0, (0,0.1), p)
     @time sol = solve(prob, Rodas4());
 
-    plot(sol)
-
+    Plots.plot(sol)
 end
 
 @testset "EMT: Droop on EMT PT1 load" begin
-    load = PT1PLoad(EMT=true, ω0=ustrip(u"rad/s", ω0),
-                    C=ustrip(u"s", Cline)/2,
-                    τ=1/(2π*50))
+    load = PT1Load(EMT=true, ω0=ustrip(u"rad/s", ω0),
+                   C=ustrip(u"s", Cline)/2,
+                   τ=1/(2π*50),
+                   Q_load=0)
+    load = ODEVertex(load, [:P_load])
 
     droopPT1 = ODEVertex(VirtualInertia.PT1Source(;τ=0.001),
                          VirtualInertia.DroopControl(Q_ref=0,
@@ -189,7 +191,7 @@ end
 
     edge = EMTRLLine(R=0,#ustrip(u"pu", Rline),
                      L=ustrip(u"s",Lline),
-                     ω0=ustrip(u"rad/s", ω0))
+                     ω0=ustrip(u"rad/s", ω0)) |> ODEEdge
 
     g = complete_graph(2)
     nd = network_dynamics([load, droopPT1], edge, g)
@@ -198,7 +200,7 @@ end
     tspan = (0.0, 5)
     prob = ODEProblem(nd, uguess, tspan, p)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
     u0 = sol[end]
 
     function affect(integrator)
@@ -211,38 +213,38 @@ end
     prob = ODEProblem(nd, u0, tspan, p; callback=cb)
     sol = solve(prob, Rodas4())
 
-    vmag = plot(timeseries(sol,1,:Vmag); label="Vmag at load")
-    plot!(timeseries(sol,2,:Vmag); label="Vmag at Conv")
+    vmag = Plots.plot(timeseries(sol,1,:Vmag); label="Vmag at load")
+    Plots.plot!(timeseries(sol,2,:Vmag); label="Vmag at Conv")
 
-    varg = plot(timeseries(sol,1,:Varg); label="Varg at load")
-    plot!(timeseries(sol,2,:Varg); label="Varg at Conv")
+    varg = Plots.plot(timeseries(sol,1,:Varg); label="Varg at load")
+    Plots.plot!(timeseries(sol,2,:Varg); label="Varg at Conv")
 
-    pmeas1 = plot(timeseries(sol,1,:Pmeas); label="P_meas at load")
-    pmeas2 = plot(timeseries(sol,2,:Pmeas); label="P_meas at conv")
-    plot!(pmeas2, timeseries(sol,2,:P_fil); label="P_fil at conv")
+    pmeas1 = Plots.plot(timeseries(sol,1,:Pmeas); label="P_meas at load")
+    pmeas2 = Plots.plot(timeseries(sol,2,:Pmeas); label="P_meas at conv")
+    Plots.plot!(pmeas2, timeseries(sol,2,:P_fil); label="P_fil at conv")
 
-    qmeas2 = plot(timeseries(sol,2,:Q_meas); label="Q_meas at conv")
-    plot!(qmeas2, timeseries(sol,2,:Q_fil); label="Q_fil at conv")
+    qmeas2 = Plots.plot(timeseries(sol,2,:Q_meas); label="Q_meas at conv")
+    Plots.plot!(qmeas2, timeseries(sol,2,:Q_fil); label="Q_fil at conv")
 
-    ωplot = plot(timeseries(sol,2,:ω); label="ω at conv")
+    ωplot = Plots.plot(timeseries(sol,2,:ω); label="ω at conv")
 
     VirtualInertia.set_ts_dtmax(0.00001)
-    # vabc = plot(timeseries(sol,1,:Va); label="Va at conv")
-    # plot!(timeseries(sol,1,:Vb); label="Vb")
-    # plot!(timeseries(sol,1,:Vc); label="Vc")
-    vabc = plot(timeseries(sol,2,:ia); label="ia at conv")
-    plot!(timeseries(sol,2,:ib); label="ib")
-    plot!(timeseries(sol,2,:ic); label="ic")
-    xlims!(0.09,0.14)
-    # ylims!(0.7, 0.9)
+    # vabc = Plots.plot(timeseries(sol,1,:Va); label="Va at conv")
+    # Plots.plot!(timeseries(sol,1,:Vb); label="Vb")
+    # Plots.plot!(timeseries(sol,1,:Vc); label="Vc")
+    vabc = Plots.plot(timeseries(sol,2,:ia); label="ia at conv")
+    Plots.plot!(timeseries(sol,2,:ib); label="ib")
+    Plots.plot!(timeseries(sol,2,:ic); label="ic")
+    Plots.xlims!(0.09,0.14)
+    # Plots.ylims!(0.7, 0.9)
 
 
-    Vplot = plot(timeseries(sol,2,:Vmag); label="Vmag at conv")
-    plot!(Vplot, timeseries(sol,2,:Vmag_ref); label="Vmag setpoint")
+    Vplot = Plots.plot(timeseries(sol,2,:Vmag); label="Vmag at conv")
+    Plots.plot!(Vplot, timeseries(sol,2,:Vmag_ref); label="Vmag setpoint")
 
     allp = [vabc, pmeas1, pmeas2, qmeas2, Vplot, ωplot]
-    plot(allp..., layout=(6,1), size=(1000,1500))
-    xlims!(0.09, 0.13)
+    Plots.plot(allp..., layout=(6,1), size=(1000,1500))
+    Plots.xlims!(0.09, 0.13)
 end
 
 @testset "SecondaryControlCS_PT1" begin
@@ -251,11 +253,12 @@ end
                         C1=0.00012696,
                         C2=0.00012696)
     second_ctrl = SecondaryControlCS_PT1(; EMT=false, τ_cs=0.001, τ=1.0)
+    second_ctrl = ODEVertex(second_ctrl, [:P_ref])
     second_ctrl.f.params
     ####
     #### First on slack
     ####
-    slack = Slack()
+    slack = ODEVertex(Slack())
 
     g = complete_graph(2)
     nd = network_dynamics([second_ctrl, slack], rmsedge, g)
@@ -264,13 +267,13 @@ end
     tspan = (0.0, 10.0)
     prob = ODEProblem(nd, uguess, tspan, p)
     sol = solve(prob, Rodas4())
-    plot(sol)
+    Plots.plot(sol)
 
-    plot(timeseries(sol, 2, :Pmeas))
+    Plots.plot(timeseries(sol, 2, :Pmeas))
 end
 
 @testset "Synchronverter on slack" begin
-    slack = Slack();
+    slack = ODEVertex(Slack());
     syncv = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
                       VirtualInertia.Synchronverter(P_ref=1, Q_ref=0.1,
                                             V_ref=1,
@@ -284,23 +287,23 @@ end
     prob = ODEProblem(nd, uguess, (0, 5))
     sol = solve(prob, Rodas4());
 
-    plot(timeseries(sol, 2, :ω)...)
-    plot(timeseries(sol, 2, :MfIf)...)
+    Plots.plot(timeseries(sol, 2, :ω)...)
+    Plots.plot(timeseries(sol, 2, :MfIf)...)
 
-    plot(timeseries(sol, 2, :Pmeas)...)
-    plot(timeseries(sol, 2, :Qmeas)...)
+    Plots.plot(timeseries(sol, 2, :Pmeas)...)
+    Plots.plot(timeseries(sol, 2, :Qmeas)...)
 
-    plot(timeseries(sol, 2, :Vmag)...)
-    plot(timeseries(sol, 2, :Varg)...)
+    Plots.plot(timeseries(sol, 2, :Vmag)...)
+    Plots.plot(timeseries(sol, 2, :Varg)...)
 
-    plot(timeseries(sol, 2, :Vmag_ref)...)
-    plot(timeseries(sol, 2, :Varg_ref)...)
+    Plots.plot(timeseries(sol, 2, :Vmag_ref)...)
+    Plots.plot(timeseries(sol, 2, :Varg_ref)...)
 end
 
 @testset "Synchronverter on load with chagne" begin
     # load = ConstPLoad()
-    load = PT1PLoad(τ=0.001);
-    @test load.f.params == [:P_ref]
+    load = ODEVertex(PT1Load(τ=0.001, Q_load=0), [:P_load])
+    @test load.f.params == [:P_load]
 
     syncv = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
                       VirtualInertia.Synchronverter(Q_ref=0,
@@ -332,12 +335,12 @@ end
     prob = ODEProblem(nd, u0, tspan, p; callback=cb)
     sol = solve(prob, Rodas4(), dtmax=0.1)
 
-    plot(timeseries(sol,1,:Pmeas); label="P_meas at load")
-    plot!(timeseries(sol,2,:Pmeas); label="P_meas at conv")
+    Plots.plot(timeseries(sol,1,:Pmeas); label="P_meas at load")
+    Plots.plot!(timeseries(sol,2,:Pmeas); label="P_meas at conv")
 
-    plot(timeseries(sol,2,:MfIf))
-    plot(timeseries(sol,2,:Te))
-    plot(timeseries(sol,2,:Q))
+    Plots.plot(timeseries(sol,2,:MfIf))
+    Plots.plot(timeseries(sol,2,:Te))
+    Plots.plot(timeseries(sol,2,:Q))
 
-    ωplot = plot(timeseries(sol,2,:ω); label="ω at conv")
+    ωplot = Plots.plot(timeseries(sol,2,:ω); label="ω at conv")
 end

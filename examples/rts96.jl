@@ -7,7 +7,8 @@ using NetworkDynamics
 using OrdinaryDiffEq
 using SteadyStateDiffEq
 using DiffEqCallbacks
-using Plots
+# import Plots
+using GLMakie: Makie
 using DataFrames
 import Base.Iterators
 
@@ -128,6 +129,8 @@ plotsym(sol, :ω, largest)
 plotsym(sol, :P_fil, largest)
 plotsym(sol, :Varg, largest)
 plotsym(sol, :δ, largest)
+
+Makie.plot(timeseries(sol, 1, :ω))
 #TODO why is the frequenccy not zero but the angle stabilizes?!
 
-plotsym(sol, :rocof)
+Makie.plot(1:10000,y->sin(y))

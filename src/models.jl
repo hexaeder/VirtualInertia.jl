@@ -15,44 +15,40 @@ function RMSPiLine(; L, R, C1, C2)
             u[3] = real(isrc)
             u[4] = imag(isrc)
         end
-        StaticEdge(f=edgef, dim=4, coupling=:fiducial, sym=[:i_r_dst,:i_i_dst, :i_r_src, :i_i_src])
+        StaticEdge(f=edgef, dim=4, coupling=:fiducial, sym=[:i_dst_r,:i_dst_i, :i_src_r, :i_src_i])
     end
 end
 
 function BSPiLine(; p_order=[], params...)
-    @variables t i_r_src(t) i_i_src(t) i_r_dst(t) i_i_dst(t)
-    @parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R X B_src B_dst
-    lineblock = IOBlock([i_r_src ~ real(-(u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_src)*(u_r_src + im*u_i_src)),
-                         i_i_src ~ imag(-(u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_src)*(u_r_src + im*u_i_src)),
-                         i_r_dst ~ real( (u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_dst)*(u_r_dst + im*u_i_dst)),
-                         i_i_dst ~ imag( (u_r_src + im*u_i_src - u_r_dst - im*u_i_dst)/(R + im*X) - (im*B_dst)*(u_r_dst + im*u_i_dst))],
-                        [u_r_src, u_i_src, u_r_dst, u_i_dst],
-                        [i_r_src, i_i_src, i_r_dst, i_i_dst];
+    @variables t i_src_r(t) i_src_i(t) i_dst_r(t) i_dst_i(t)
+    @parameters u_src_r(t) u_src_i(t) u_dst_r(t) u_dst_i(t) R X B_src B_dst
+    lineblock = IOBlock([i_src_r ~ real(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
+                         i_src_i ~ imag(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
+                         i_dst_r ~ real( (u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i)),
+                         i_dst_i ~ imag( (u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i))],
+                        [u_src_r, u_src_i, u_dst_r, u_dst_i],
+                        [i_src_r, i_src_i, i_dst_r, i_dst_i];
                         name=:PiLine)
     lineblock = replace_vars(lineblock, params)
 end
 
 function EMTRLLine(; params...)
     @variables t i_r(t) i_i(t)
-    @parameters u_r_src(t) u_i_src(t) u_r_dst(t) u_i_dst(t) R L ω0
+    @parameters u_src_r(t) u_src_i(t) u_dst_r(t) u_dst_i(t) R L ω0
     dt = Differential(t)
-    lineblock = IOBlock([dt(i_r) ~  ω0 * i_i  - R/L * i_r + 1/L*(u_r_src - u_r_dst),
-                         dt(i_i) ~ -ω0 * i_r  - R/L * i_i + 1/L*(u_i_src - u_i_dst)],
-                        [u_r_src, u_i_src, u_r_dst, u_i_dst],
+    lineblock = IOBlock([dt(i_r) ~  ω0 * i_i  - R/L * i_r + 1/L*(u_src_r - u_dst_r),
+                         dt(i_i) ~ -ω0 * i_r  - R/L * i_i + 1/L*(u_src_i - u_dst_i)],
+                        [u_src_r, u_src_i, u_dst_r, u_dst_i],
                         [i_r, i_i],
                         name=:RLLine)
-    lineblock = set_p(lineblock, params)
-    if !isempty(lineblock.iparams)
-        @warn "There are open parameters on this line: $(lineblock.iparams)"
-    end
-    ODEEdge(lineblock)
+    lineblock = replace_vars(lineblock, params)
+    lineblock
 end
 
 function Slack()
     @variables t u_r(t) u_i(t)
     dt = Differential(t)
     slackblock = IOBlock([dt(u_r) ~ 0, dt(u_i) ~ 0], [], [u_r, u_i]; name=:slack)
-    ODEVertex(slackblock)
 end
 
 function ConstPLoad(;params...)
@@ -65,9 +61,7 @@ function ConstPLoad(;params...)
                         [i_r, i_i], [u_r, u_i],
                         name=:load)
     loadblock = substitute_algebraic_states(loadblock)
-    loadblock = set_p(loadblock, params)
-
-    ODEVertex(loadblock, ModelingToolkit.getname.(loadblock.iparams))
+    loadblock = replace_vars(loadblock, params)
 end
 
 function ConstLoad(;EMT=false, params...)
@@ -83,11 +77,12 @@ function PT1Load(;EMT=false, params...)
 end
 
 function SecondaryControlCS_PI(; EMT=false, params...)
-    cs = Components.PT1CurrentSource()
-    cs = set_p(cs; τ=0.001)
+    cs = Components.PT1CurrentSource(P=:P_ref, Q=0)
+    cs = make_input(cs, :P_ref)
+    cs = replace_vars(cs; τ=0.001)
 
     pll = Components.ReducedPLL()
-    pll = set_p(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
+    pll = replace_vars(pll; ω_lp=1.32 * 2π*50, Kp=20.0, Ki=2.0)
 
     @variables t P_ref_pi(t) μ(t)
     @parameters P_ref ω(t) Ki Kp
@@ -105,12 +100,12 @@ function SecondaryControlCS_PI(; EMT=false, params...)
     pisrc = connect_system(pisrc)
 
     bus = BusBar(pisrc; autopromote=true, EMT)
-    bus = set_p(bus, params)
-    ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
+    bus = replace_vars(bus, params)
 end
 
 function SecondaryControlCS_PT1(; EMT=false, params...)
-    cs = Components.PT1CurrentSource(;:P_ref=>:P_ref_int, :τ=>:τ_cs)
+    cs = Components.PT1CurrentSource(P=:P_ref_int, τ=:τ_cs, Q=0)
+    cs = make_input(cs, :P_ref_int)
 
     lpf = Components.LowPassFilter(;:output=>:P_ref_int, :input=>:P_ref)
     lpf = make_iparam(lpf, :P_ref)
@@ -118,6 +113,5 @@ function SecondaryControlCS_PT1(; EMT=false, params...)
     cs = @connect lpf.P_ref_int => cs.P_ref_int outputs=:remaining name=:cs
 
     bus = BusBar(cs; autopromote=true, EMT)
-    bus = set_p(bus, params)
-    ODEVertex(bus, ModelingToolkit.getname.(bus.iparams))
+    bus = replace_vars(bus, params)
 end

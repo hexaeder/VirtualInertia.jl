@@ -5,7 +5,7 @@ using Graphs
 using OrdinaryDiffEq
 using DiffEqCallbacks
 using SteadyStateDiffEq
-using Plots
+import Plots
 using Unitful
 
 #=
@@ -108,7 +108,7 @@ function plotsym!(p::Plots.Plot, sol::ODESolution, sym, nodes=[1,2,3,4])
                  4 => " @ conv2")
     for i in nodes
         try
-            plot!(p, timeseries(sol, i, sym); label=string(sym)*names[i])
+            Plots.plot!(p, timeseries(sol, i, sym); label=string(sym)*names[i])
         catch
             @warn "Could not create timeseries for $sym on node $i. Skipped!"
         end
@@ -126,16 +126,16 @@ plts = Any[]
 for K in [0.1, 0.8, 1.2]
     sol = solvesystem(τ_P=1e-6, τ_Q=1e-6, K_P=K, K_Q=K, τ_sec=1, tmax=3);
     p1 = plotsym(sol, :Pmeas, [3,4,1])
-    ## ylims!(0.95,1.45)
+    ## Plots.ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3,4])
     p3 = plotsym(sol, :ωmeas, [1,3,4])
-    xlims!(p3, 0.09, 0.2)
+    Plots.xlims!(p3, 0.09, 0.2)
     title!(p1, "K = $K")
     storage3 = needed_storage(sol, 3)
     storage4 = needed_storage(sol, 4)
     title!(p2, "Conv1 bat=$storage3")
     title!(p3, "Conv2 bat=$storage4")
-    push!(plts, plot(p1, p2, p3, layout=(1,:)))
+    push!(plts, Plots.plot(p1, p2, p3, layout=(1,:)))
 end
 plot(plts..., layout=(:,1), size=(1600,1000))
 
@@ -147,17 +147,17 @@ K = 0.8
 for τ in [1.3, 0.1, 0.01, 0.001]
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=12.5);
     p1 = plotsym(sol, :Pmeas, [3,4])
-    ## ylims!(0.95,1.45)
+    ## Plots.ylims!(0.95,1.45)
     p2 = plotsym(sol, :imag, [3,4])
-    ## ylims!(0.7,0.95)
+    ## Plots.ylims!(0.7,0.95)
     p3 = plotsym(sol, :ωmeas, [3,4])
-    xlims!(p3, 0.09, 0.2)
+    Plots.xlims!(p3, 0.09, 0.2)
     title!(p1, "τ = $τ")
     storage3 = needed_storage(sol, 3)
     storage4 = needed_storage(sol, 4)
     title!(p2, "Conv1 bat=$storage3")
     title!(p3, "Conv2 bat=$storage4")
-    push!(plts, plot(p1, p2, p3, layout=(1,:)))
+    push!(plts, Plots.plot(p1, p2, p3, layout=(1,:)))
 end
 plot(plts..., layout=(:,1), size=(1600,800))
 
@@ -178,7 +178,7 @@ for τ in [1.3, 0.1, 0.01, 0.001]
 end
 @show int
 
-p = plot(legend=:bottomright)
+p = Plots.plot(legend=:bottomright)
 for τ in [1.3, 0.1, 0.01, 0.001]
     K=0.8
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=20.0);
@@ -186,7 +186,7 @@ for τ in [1.3, 0.1, 0.01, 0.001]
 end
 current()
 
-p = plot(legend=:bottomright)
+p = Plots.plot(legend=:bottomright)
 for τ in [1.3, 0.1, 0.01, 0.001]
     K=0.8
     sol = solvesystem(τ_P=τ, τ_Q=τ, K_P=K, K_Q=K, τ_sec=1, tmax=20.0);

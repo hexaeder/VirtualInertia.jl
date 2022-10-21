@@ -65,3 +65,6 @@ function u0guess(s::Symbol)
         0.0
     end
 end
+
+treesyms(x) = treesyms(length(x))
+treesyms(i::Integer) = Iterators.flatten((Iterators.repeated('├', i-1), '└'))

@@ -1,14 +1,14 @@
 export Inverter, VSwithLoad, DroopControl, Synchronverter, PerfectSource, PT1Source
 
 function Inverter(inner, outer; name=Symbol(string(outer.name)*"_"*string(inner.name)))
-    @assert BlockSpec([:i_i, :i_r, :u_r_ref, :u_i_ref], [:u_r, :u_i])(inner) "Inner ctrl loop does not meet expectation."
-    @assert BlockSpec([], [:u_r_ref, :u_i_ref]; in_strict=false)(outer)  "Outer ctrl loop does not meet expectation."
+    @assert BlockSpec([:i_i, :i_r, :u_ref_r, :u_ref_i], [:u_r, :u_i])(inner) "Inner ctrl loop does not meet expectation."
+    @assert BlockSpec([], [:u_ref_r, :u_ref_i]; in_strict=false)(outer)  "Outer ctrl loop does not meet expectation."
 
     outerinputs = ModelingToolkit.getname.(outer.inputs)
-    :u_r ∈ outerinputs && @error "Outer shoud use :u_r_meas instead of :u_r"
-    :u_i ∈ outerinputs && @error "Outer shoud use :u_i_meas instead of :u_i"
-    :i_r ∈ outerinputs && @error "Outer shoud use :i_r_meas instead of :i_r"
-    :i_i ∈ outerinputs && @error "Outer shoud use :i_i_meas instead of :i_i"
+    :u_r ∈ outerinputs && @error "Outer shoud use :u_meas_r instead of :u_r"
+    :u_i ∈ outerinputs && @error "Outer shoud use :u_meas_i instead of :u_i"
+    :i_r ∈ outerinputs && @error "Outer shoud use :i_meas_r instead of :i_r"
+    :i_i ∈ outerinputs && @error "Outer shoud use :i_meas_i instead of :i_i"
 
     sys = IOSystem(:autocon, [outer, inner];
                    outputs=:remaining,
@@ -54,8 +54,8 @@ function DroopControl(; params...)
     @named Qdroop = Components.Droop(; x_ref=:Q_ref, K=:K_Q, u_ref=:V_ref, u=:V, x=:Q_fil)
     Qsys = @connect Qfil.Q_fil => Qdroop.Q_fil outputs=:remaining name=:Qsys
 
-    @named PQmeas = Components.Power(; u_r=:u_r_meas, u_i=:u_i_meas,
-                                     i_r=:i_r_meas, i_i=:i_i_meas,
+    @named PQmeas = Components.Power(; u_r=:u_meas_r, u_i=:u_meas_i,
+                                     i_r=:i_meas_r, i_i=:i_meas_i,
                                      P=:P_meas, Q=:Q_meas)
 
     refgen = Components.VRefGen()
@@ -79,23 +79,23 @@ function Synchronverter(; params...)
 
     # Voltage Loop
     @variables t ΔQ(t) MfIf(t) V(t)
-    @parameters u_r_meas(t) u_i_meas(t) Q(t) Q_ref Dq V_ref Kv
-    @named vloop = IOBlock([V ~ sqrt(u_r_meas^2 + u_i_meas^2),
+    @parameters u_meas_r(t) u_meas_i(t) Q(t) Q_ref Dq V_ref Kv
+    @named vloop = IOBlock([V ~ sqrt(u_meas_r^2 + u_meas_i^2),
                             ΔQ ~ Q_ref - Q + Dq*(V_ref - V),
                             dt(MfIf) ~ ΔQ/Kv],
-                           [Q, u_r_meas, u_i_meas],
+                           [Q, u_meas_r, u_meas_i],
                            [MfIf])
     BlockSystems.WARN[] = true
 
     # main model
-    @variables t Te(t) u_r_ref(t) u_i_ref(t) Q(t)
-    @parameters i_r_meas(t) i_i_meas(t) MfIf(t) ω(t) θ(t) ω0
-    @named machine = IOBlock([Te      ~  sqrt(3/2) * MfIf * (cos(θ)*i_r_meas + sin(θ)*i_i_meas),
-                              u_r_ref ~  sqrt(3/2) * MfIf * (ω0 + ω) * cos(θ),
-                              u_i_ref ~  sqrt(3/2) * MfIf * (ω0 + ω) * sin(θ),
-                              Q       ~ -sqrt(3/2) * MfIf * (ω0 + ω) * (-sin(θ)*i_r_meas + cos(θ)*i_i_meas)],
-                             [ω, θ, i_r_meas, i_i_meas, MfIf],
-                             [u_r_ref, u_i_ref, Q, Te])
+    @variables t Te(t) u_ref_r(t) u_ref_i(t) Q(t)
+    @parameters i_meas_r(t) i_meas_i(t) MfIf(t) ω(t) θ(t) ω0
+    @named machine = IOBlock([Te      ~  sqrt(3/2) * MfIf * (cos(θ)*i_meas_r + sin(θ)*i_meas_i),
+                              u_ref_r ~  sqrt(3/2) * MfIf * (ω0 + ω) * cos(θ),
+                              u_ref_i ~  sqrt(3/2) * MfIf * (ω0 + ω) * sin(θ),
+                              Q       ~ -sqrt(3/2) * MfIf * (ω0 + ω) * (-sin(θ)*i_meas_r + cos(θ)*i_meas_i)],
+                             [ω, θ, i_meas_r, i_meas_i, MfIf],
+                             [u_ref_r, u_ref_i, Q, Te])
 
     @named syncvert = IOSystem(:autocon, [floop, vloop, machine], outputs=:remaining, globalp=[:ω0])
     con = connect_system(syncvert)
@@ -113,12 +113,12 @@ amplitude with lag.
 """
 function PT1Source(; params...)
     @variables t A(t) u_r(t) u_i(t)
-    @parameters τ u_r_ref(t) u_i_ref(t)
+    @parameters τ u_ref_r(t) u_ref_i(t)
     dt = Differential(t)
-    @named PT1source = IOBlock([dt(A) ~ 1/τ*(√(u_r_ref^2 + u_i_ref^2) - A),
-                                u_r ~ A/√(u_r_ref^2 + u_i_ref^2) * u_r_ref,
-                                u_i ~ A/√(u_r_ref^2 + u_i_ref^2) * u_i_ref],
-                               [u_r_ref, u_i_ref],
+    @named PT1source = IOBlock([dt(A) ~ 1/τ*(√(u_ref_r^2 + u_ref_i^2) - A),
+                                u_r ~ A/√(u_ref_r^2 + u_ref_i^2) * u_ref_r,
+                                u_i ~ A/√(u_ref_r^2 + u_ref_i^2) * u_ref_i],
+                               [u_ref_r, u_ref_i],
                                [u_r, u_i])
 
     if !isempty(params)
@@ -137,10 +137,10 @@ Perfect Voltage source which follows the reference directly.
 """
 function PerfectSource(; params...)
     @variables t u_r(t) u_i(t)
-    @parameters u_r_ref(t) u_i_ref(t)
-    @named Vsource = IOBlock([u_r ~ u_r_ref,
-                              u_i ~ u_i_ref],
-                             [u_r_ref, u_i_ref],
+    @parameters u_ref_r(t) u_ref_i(t)
+    @named Vsource = IOBlock([u_r ~ u_ref_r,
+                              u_i ~ u_ref_i],
+                             [u_ref_r, u_ref_i],
                              [u_r, u_i])
 
     ui_meas = Components.UIMeas()
