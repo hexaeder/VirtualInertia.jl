@@ -4,17 +4,58 @@ export blockstates, getstate, timeseries, meanseries
 export NADIR, ROCOF, needed_storage
 
 const TS_DTMAX = Ref(0.01)
+const MEAS_STATES = [:_ω, :_δ, :_rocof, :_P, :_Q]
+const MEAS_STATES_COMPLEX = [:_u, :_i, :_S]
 
 blockstates(sol, idx) = blockstates(sol.prob.f, idx)
 function blockstates(nd::ODEFunction, idx)
-    wrapper = _getwrapper(nd,idx)
-    vcat(wrapper.states, wrapper.rem_states)
+    wrp = _getwrapper(nd,idx)
+
+    println("Actual States")
+    states = _group_states(wrp.states)
+    for (s, c) in zip(states, treesyms(states))
+        println(" $c $s")
+    end
+    println("Removed States")
+    states = _group_states(wrp.rem_states)
+    for (s, c) in zip(states, treesyms(states))
+        println(" $c $s")
+    end
+    println("Measured States (available for all nodes)")
+    for (s, c) in zip(MEAS_STATES_COMPLEX, treesyms(length(MEAS_STATES_COMPLEX) + 1))
+        println(" $c Complex: $s")
+    end
+    for (s, c) in zip(MEAS_STATES, treesyms(length(MEAS_STATES)))
+        println(" $c $s")
+    end
+
+    println("All complex states can be used with _r, _i, _mag, _arg, _a, _b, _c suffix")
 end
 
 function _getwrapper(nd, idx)
     ndobj = nd.f
     _group = findfirst(group -> idx ∈ group, ndobj.unique_v_indices)
     ndobj.unique_vertices![_group].f
+end
+
+"""
+Find complex states with _r and _i suffix
+"""
+function _group_states(states)
+    states = string.(states)
+    complex_pairs = String[]
+    for state in states
+        if occursin(r"_r$", state)
+            m = match(r"^(.*)_r$", state)
+            name = m[1]
+            if !isnothing(findfirst(isequal(name*"_i"), states))
+                push!(complex_pairs, name)
+            end
+        end
+    end
+    wocomplex = sort!(filter(s -> s ∉ complex_pairs .* "_r" ∪ complex_pairs .* "_i", states))
+    complex = sort!(replace.(complex_pairs, r"^(.*)$" => s"Complex: \1"))
+    append!(complex, wocomplex)
 end
 
 @nospecialize
@@ -34,63 +75,63 @@ function getstate(sol, t::Number, p, idx, state)
         input = flowsum(get_dst_edges(gd, idx))
         pblock = p isa Tuple ? p[1][idx] : nothing
         return wrapper.g_oop(vstate, input, pblock, t)[stateidx]
-    elseif state==:Vmag
-        return norm(vstate[1:2])
-    elseif state==:Varg
-        return atan(vstate[2], vstate[1])
-    elseif state==:imag
+    # measured states below
+    elseif state==:_u_r
+        return vstate[1]
+    elseif state==:_u_i
+        return vstate[2]
+    elseif state==:_i_r
+        flowsum(get_dst_edges(gd, idx))[1]
+    elseif state==:_i_i
+        flowsum(get_dst_edges(gd, idx))[2]
+    elseif state==:_i_mag
         input = flowsum(get_dst_edges(gd, idx))
         return norm(input[1:2])
-    elseif state==:iarg
+    elseif state==:_i_arg
         input = flowsum(get_dst_edges(gd, idx))
         return atan(input[2], input[1])
-    elseif state==:Vmag_ref
-        u_ref_r = getstate(sol, t, p, idx, :u_ref_r)
-        u_ref_i = getstate(sol, t, p, idx, :u_ref_i)
-        return norm([u_ref_r, u_ref_i])
-    elseif state==:Varg_ref
-        u_ref_r = getstate(sol, t, p, idx, :u_ref_r)
-        u_ref_i = getstate(sol, t, p, idx, :u_ref_i)
-        return atan(u_ref_i, u_ref_r)
-    elseif state==:ωmeas
+    elseif occursin(r"_mag" , string(state))
+        name = match(r"^(.*)_mag$", string(state))[1]
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        return norm((_r, _i))
+    elseif occursin(r"_arg" , string(state))
+        name = match(r"^(.*)_arg$", string(state))[1]
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        return atan(_i, _r)
+    elseif state==:_ω
         u_r, u_i = vstate[1:2]
         dx = sol(t, Val{1})
         gd = nd(dx, p, t, GetGD)
         dvstate = collect(get_vertex(gd, idx))
         u_dot_r, u_dot_i = dvstate[1:2]
         return -(u_i*u_dot_r - u_r*u_dot_i)/(u_i^2 + u_r^2)
-    elseif state==:rocof
+    elseif state==:_rocof
         h = 0.005
         t1 = t-h < sol.t[begin] ? t : t-h
         t2 = t+h < sol.t[begin] ? t : t+h
-        ω1 = getstate(sol, t1, p, idx, :ωmeas)
-        ω2 = getstate(sol, t2, p, idx, :ωmeas)
+        ω1 = getstate(sol, t1, p, idx, :_ω)
+        ω2 = getstate(sol, t2, p, idx, :_ω)
         return (ω2-ω1)/(t2-t1)
-    elseif state==:Va
-        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[1]
-    elseif state==:Vb
-        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[2]
-    elseif state==:Vc
-        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[3]
-    elseif state==:ia
-        i_r, i_i = flowsum(get_dst_edges(gd, idx))
-        return (Tdqinv(2π*50*t)*[i_r, i_i])[1]
-    elseif state==:ib
-        i_r, i_i = flowsum(get_dst_edges(gd, idx))
-        return (Tdqinv(2π*50*t)*[i_r, i_i])[2]
-    elseif state==:ic
-        i_r, i_i = flowsum(get_dst_edges(gd, idx))
-        return (Tdqinv(2π*50*t)*[i_r, i_i])[3]
-    elseif state==:Smeas
+    elseif occursin(r"_[abc]" , string(state))
+        m = match(r"^(.*)_(.)$", string(state))
+        name = m[1]
+        phase = m[2]
+        phase = Dict("a"=>1, "b"=>2, "c"=>3)[phase]
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[phase]
+    elseif state==:_S
         u_r, u_i = vstate[1:2]
         i_r, i_i = flowsum(get_dst_edges(gd, idx))
         return (u_r + im*u_i)*(-i_r + im*i_i)
-    elseif state==:Pmeas
-        return real(getstate(sol, t, p, idx, :Smeas))
-    elseif state==:Qmeas
-        return imag(getstate(sol, t, p, idx, :Smeas))
+    elseif state==:_P || state==:_S_r
+        return real(getstate(sol, t, p, idx, :_S))
+    elseif state==:_Q || state==:_S_i
+        return imag(getstate(sol, t, p, idx, :_S))
     else
-        error("Don't know state $state.")
+        error("Don't know state $state. Call `blocksates(sol, idx)` to get list of states.")
     end
 end
 
