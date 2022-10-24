@@ -62,8 +62,12 @@ function _group_states(states)
 end
 
 @nospecialize
-getstate(sol, t::Number, idx, state) = getstate(sol, t, nothing, idx, state)
-function getstate(sol, t::Number, p, idx, state)
+function getstate(sol, t::Number, idxs, state)
+   [getstate(sol, t, sol.prob.p, idx, state; err=false) for idx in idxs]
+end
+
+getstate(sol, t::Number, idx::Integer, state) = getstate(sol, t, nothing, idx, state)
+function getstate(sol, t::Number, p, idx::Integer, state; err=true)
     nd = sol.prob.f
     x = sol(t)
     gd = nd(x, p, t, GetGD)
@@ -95,13 +99,13 @@ function getstate(sol, t::Number, p, idx, state)
         return atan(input[2], input[1])
     elseif occursin(r"_mag" , string(state))
         name = match(r"^(.*)_mag$", string(state))[1]
-        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
-        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"); err)
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"); err)
         return norm((_r, _i))
     elseif occursin(r"_arg" , string(state))
         name = match(r"^(.*)_arg$", string(state))[1]
-        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
-        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"); err)
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"); err)
         return atan(_i, _r)
     elseif state==:_ω
         u_r, u_i = vstate[1:2]
@@ -114,27 +118,31 @@ function getstate(sol, t::Number, p, idx, state)
         h = 0.005
         t1 = t-h < sol.t[begin] ? t : t-h
         t2 = t+h < sol.t[begin] ? t : t+h
-        ω1 = getstate(sol, t1, p, idx, :_ω)
-        ω2 = getstate(sol, t2, p, idx, :_ω)
+        ω1 = getstate(sol, t1, p, idx, :_ω; err)
+        ω2 = getstate(sol, t2, p, idx, :_ω; err)
         return (ω2-ω1)/(t2-t1)
     elseif occursin(r"_[abc]" , string(state))
         m = match(r"^(.*)_(.)$", string(state))
         name = m[1]
         phase = m[2]
         phase = Dict("a"=>1, "b"=>2, "c"=>3)[phase]
-        _r = getstate(sol, t, p, idx, Symbol(name*"_r"))
-        _i = getstate(sol, t, p, idx, Symbol(name*"_i"))
+        _r = getstate(sol, t, p, idx, Symbol(name*"_r"); err)
+        _i = getstate(sol, t, p, idx, Symbol(name*"_i"); err)
         return (Tdqinv(2π*50*t)*[vstate[1], vstate[2]])[phase]
     elseif state==:_S
         u_r, u_i = vstate[1:2]
         i_r, i_i = flowsum(get_dst_edges(gd, idx))
         return (u_r + im*u_i)*(-i_r + im*i_i)
     elseif state==:_P || state==:_S_r
-        return real(getstate(sol, t, p, idx, :_S))
+        return real(getstate(sol, t, p, idx, :_S; err))
     elseif state==:_Q || state==:_S_i
-        return imag(getstate(sol, t, p, idx, :_S))
+        return imag(getstate(sol, t, p, idx, :_S; err))
     else
-        error("Don't know state $state. Call `blocksates(sol, idx)` to get list of states.")
+        if err
+            error("Don't know state $state. Call `blocksates(sol, idx)` to get list of states.")
+        else
+            NaN
+        end
     end
 end
 
@@ -252,7 +260,6 @@ end
 @specialize
 
 function Makie.convert_arguments(P::Makie.PointBased, ts::TimeSeries)
-    @show P
     return (Point2f.(zip(ts.t, ts.x)),)
 end
 Makie.plottype(::TimeSeries) = Makie.Lines

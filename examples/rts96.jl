@@ -1,4 +1,5 @@
 using VirtualInertia
+using VirtualInertia: timeseries
 using MetaGraphs
 using Graphs
 using BlockSystems
@@ -9,6 +10,9 @@ using SteadyStateDiffEq
 using DiffEqCallbacks
 # import Plots
 using GLMakie: Makie
+using Makie.Colors
+using Makie.ColorSchemes
+using GraphMakie
 using DataFrames
 import Base.Iterators
 
@@ -124,3 +128,10 @@ cb = PresetTimeCallback(0.1, affect)
 tspan = (0, 0.25)
 prob = ODEProblem(nd, u0, tspan, params; callback=cb)
 sol = solve(prob, Rodas4());
+
+
+inspect_solution(sol, network)
+# using GLMakie
+# using VirtualInertia: main_window
+
+# main_window()

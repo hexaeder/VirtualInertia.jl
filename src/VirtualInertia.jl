@@ -243,5 +243,6 @@ include("models.jl")
 include("solution_inspection.jl")
 include("SerializeDict.jl")
 include("import_network.jl")
+include("interactive.jl")
 
 end
