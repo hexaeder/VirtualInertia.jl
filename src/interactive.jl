@@ -11,7 +11,7 @@ using GraphMakie.NetworkLayout: spring
 
 export inspect_solution
 
-function inspect_solution(sol, network)
+function inspect_solution(sol, network, precord::PRecord)
     fig = Figure(resolution = (1200, 1200))
     ####
     #### selector grid to control plot
@@ -111,7 +111,7 @@ function inspect_solution(sol, network)
         extremas = Float64[]
         for i in 1:nv(network)
             try
-                x = timeseries(sol, i, nstatesym).x
+                x = timeseries(sol, precord, i, nstatesym).x
                 if rel
                     x .= x .- x[begin]
                 end
@@ -144,7 +144,7 @@ function inspect_solution(sol, network)
 
     ## Graphplot
     gpax = Axis(gpgrid[1,1])
-    args = gparguments(sol, network; t, ncolorscheme, nstatesym, ncolorrange, sel_nodes, rel_to_u0)
+    args = gparguments(sol, precord, network; t, ncolorscheme, nstatesym, ncolorrange, sel_nodes, rel_to_u0)
     graphplot!(gpax,network; args...)
     hidespines!(gpax)
     hidedecorations!(gpax)
@@ -197,14 +197,14 @@ function inspect_solution(sol, network)
     ##### Open node plots in new windows
     #####
     on(nselectors[3].clicks) do n
-        f = nodeplot_window(sol, tslider, sel_nodes; tlims=tinterval_slider.interval)
+        f = nodeplot_window(sol, precord, tslider, sel_nodes; tlims=tinterval_slider.interval)
         sc = display(GLMakie.Screen(), f)
     end
 
     fig
 end
 
-function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin], sol.t[end])))
+function nodeplot_window(sol, precord, tslider, sel_nodes; tlims=Observable((sol.t[begin], sol.t[end])))
     fig = Figure(resolution=(1000, 800))
 
     symgrid = fig[1,1] = GridLayout(tellwidth=false, tellheight=true)
@@ -215,11 +215,21 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
                                 Button(fig, label="_rocof")]
     symbox = symgrid[1,6] = Textbox(fig, width=150)
 
+    reltoggle = symgrid[1,7] = Toggle(fig)
+    symgrid[1,8] = Label(fig, "relativ to u0")
+    rel_to_u0 = reltoggle.active
+
     for i in 1:5
         on(buttons[i].clicks) do n
             lab = buttons[i].label[]
-            symbox.displayed_string[] = lab
-            symbox.stored_string[] = lab
+            new = if shift_pressed(fig)
+                current = symbox.stored_string[]
+                current * ", " * lab
+            else
+                lab
+            end
+            symbox.displayed_string[] = new
+            symbox.stored_string[] = new
         end
     end
 
@@ -229,7 +239,6 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
             syms[] = Symbol[]
         else
             try
-                @show "Update string" s
                 parts = split(s, ',')
                 parts = replace.(parts, r"\s"=>s"")
                 syms[] = Symbol.(parts)
@@ -246,8 +255,14 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
         on(menu.selection) do sel
             @debug "Menu Selection" sel
             if sel isa String
-                symbox.displayed_string[] = sel
-                symbox.stored_string[] = sel
+                new = if shift_pressed(fig)
+                    current = symbox.stored_string[]
+                    current * ", " * sel
+                else
+                    sel
+                end
+                symbox.displayed_string[] = new
+                symbox.stored_string[] = new
             end
         end
     end
@@ -256,35 +271,39 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
 
     plots = Dict{Int, Any}()
 
-    on(syms; update=true) do syms
-        @debug "Syms chagned to $syms, clear all."
+    onany(syms, rel_to_u0) do syms, rel
+        @debug "Syms chagned to $syms "*(rel ? "(relative) " : "") * "clear all."
         empty!(ax)
         empty!(plots)
         Makie.vlines!(ax, tslider.value; color=:black)
     end
+    notify(syms)
 
     on(tlims, update=true) do lims
         xlims!(ax, lims)
     end
 
     legend = nothing
-    onany(sel_nodes, syms) do selected, syms
+    onany(sel_nodes, syms, rel_to_u0) do selected, syms, rel
         added   = setdiff(selected, keys(plots))
         removed = setdiff(keys(plots), selected)
         for i in added
             plist = []
             for (isym, s) in enumerate(syms)
                 try
-                    ts = timeseries(sol, i, s)
+                    ts = timeseries(sol, precord, i, s)
+                    if rel
+                        ts = TimeSeries(ts.t, ts.x .- ts.x[begin], ts.name)
+                    end
                     p = lines!(ax, ts;
-                               label=string(s)*" @ "*string(i),
+                               label=string(s)*(rel ? " (rel)" : "")* " @ "*string(i),
                                linewidth=3,
                                color=Cycled(i),
                                linestyle=ax.palette.linestyle[][isym])
                     push!(plist, p)
-                    @debug "Added plot $s for node $i"
+                    @debug "Added plot $s "*(rel ? " (rel)" : "")*" for node $i"
                 catch e
-                    @debug "Could not plot $s for node $i" e
+                    @debug "Could not plot $s "*(rel ? " (rel)" : "")*" for node $i" e
                     # variable not found
                 end
             end
@@ -322,6 +341,7 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
     register_keyboard_interaction!(fig, tslider)
 
     # click to set time
+    # TODO: this blocks the rectagle zoom interaction
     set_time_interaction = (event::MouseEvent, axis) -> begin
         if event.type === MouseEventTypes.leftclick
             pos = mouseposition(axis.scene)[1]
@@ -360,19 +380,14 @@ function states_dropdown(fig, sol, sel_nodes)
 end
 
 function register_keyboard_interaction!(fig, tslider)
-    steps = 1
     on(fig.scene.events.keyboardbutton) do e
-        if e.key == Keyboard.left_shift || e.key == Keyboard.right_shift
-            if e.action == Keyboard.press
-                steps = 10
-            elseif e.action == Keyboard.release
-                steps = 1
-            end
-        elseif e.action == Keyboard.press || e.action == Keyboard.repeat
+        if e.action == Keyboard.press || e.action == Keyboard.repeat
             if e.key == Keyboard.left
+                steps = shift_pressed(fig) ? 10 : 1
                 mv_slider(tslider, -steps)
                 return true
             elseif e.key == Keyboard.right
+                steps = shift_pressed(fig) ? 10 : 1
                 mv_slider(tslider, steps)
                 return true
             end
@@ -381,12 +396,18 @@ function register_keyboard_interaction!(fig, tslider)
     end
 end
 
+function shift_pressed(fig)
+    keys = fig.scene.events.keyboardstate
+    Makie.Keyboard.left_shift ∈ keys || Makie.Keyboard.right_shift ∈ keys
+end
+
 function mv_slider(slider, steps=1)
     idx = slider.selected_index[]
     set_close_to!(slider, slider.range[][clamp(idx+steps, firstindex(slider.range[]), lastindex(slider.range[]))])
 end
 
 function gparguments(sol::ODESolution,
+                     precord::PRecord,
                      network::MetaGraph;
                      t::Observable,
                      nstatesym,
@@ -404,7 +425,7 @@ function gparguments(sol::ODESolution,
     onany(nstatesym, rel_to_u0) do nstatesym, rel
         if rel
             for i in 1:NV
-                u0statevec[][i] = getstate(sol, sol.t[begin], sol.prob.p, i, nstatesym; err=false)
+                u0statevec[][i] = getstate(sol, sol.t[begin], precord(sol.t[begin]), i, nstatesym; err=false)
             end
         end
         notify(u0statevec)
@@ -414,7 +435,7 @@ function gparguments(sol::ODESolution,
     statevec = Observable(Vector{Float64}(undef, NV))
     onany(t, nstatesym, u0statevec) do t, nstatesym, u0statevec
         for i in 1:NV
-            statevec[][i] = getstate(sol, t, sol.prob.p, i, nstatesym; err=false)
+            statevec[][i] = getstate(sol, t, precord(t), i, nstatesym; err=false)
             if rel_to_u0[]
                 statevec[][i] -= u0statevec[i]
             end

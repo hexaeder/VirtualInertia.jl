@@ -33,7 +33,9 @@ function VSwithLoad(vs; name=Symbol(string(vs.name)*"_w_load"), params...)
 
     vs = replace_vars(vs; i_r=:i_int_r, i_i=:i_int_i)
 
-    sys = IOSystem(:autocon, [vs, pcs, kirchhoff]; outputs=[vs.u_r, vs.u_i], name)
+    @named loadPQ = Components.Power(i_r = :i_load_r, i_i = :i_load_i, P=:loadP, Q=:laodQ)
+
+    sys = IOSystem(:autocon, [vs, pcs, kirchhoff, loadPQ]; outputs=[vs.u_r, vs.u_i], name)
     con = connect_system(sys)
 end
 

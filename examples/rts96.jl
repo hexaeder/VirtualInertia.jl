@@ -15,6 +15,7 @@ using Makie.ColorSchemes
 using GraphMakie
 using DataFrames
 import Base.Iterators
+ENV["JULIA_DEBUG"] = "VirtualInertia"
 
 #####
 ##### Import Network
@@ -111,6 +112,10 @@ largest = findmax(x -> ismissing(x) ? 0 : x, nodes_df.P_inj)[2]
 disturbed = 10
 disturbance = -0.1
 
+tspan = (0, 5.)
+prob = ODEProblem(nd, u0, tspan, params)
+precord = VirtualInertia.PRecord(prob)
+
 function affect(integrator)
     newp = deepcopy(integrator.p)
     distp    = newp[1][disturbed] |> collect
@@ -121,17 +126,10 @@ function affect(integrator)
     newp[1][largest] = Tuple(largestp)
 
     integrator.p = (newp[1], newp[2])
+    record!(precord, integrator)
     auto_dt_reset!(integrator)
 end
 cb = PresetTimeCallback(0.1, affect)
+sol = solve(prob, Rodas4(); dtmax=0.01, callback=cb);
 
-tspan = (0, 0.25)
-prob = ODEProblem(nd, u0, tspan, params; callback=cb)
-sol = solve(prob, Rodas4(); dtmax=0.001);
-
-
-inspect_solution(sol, network)
-# using GLMakie
-# using VirtualInertia: main_window
-
-# main_window()
+fig = inspect_solution(sol, network, precord)

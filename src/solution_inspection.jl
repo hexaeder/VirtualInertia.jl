@@ -100,11 +100,10 @@ end
 
 
 @nospecialize
-function getstate(sol, t::Number, idxs, state)
-   [getstate(sol, t, sol.prob.p, idx, state; err=false) for idx in idxs]
+function getstate(sol, t::Number, p, idxs, state)
+   [getstate(sol, t, p, idx, state; err=false) for idx in idxs]
 end
 
-getstate(sol, t::Number, idx::Integer, state) = getstate(sol, t, nothing, idx, state)
 function getstate(sol, t::Number, p, idx::Integer, state; err=true)
     nd = sol.prob.f
     x = sol(t)
@@ -190,8 +189,8 @@ struct TimeSeries
     name::String
 end
 
-_timeseries(sol, ts, idx::Int, state) = _timeseries(sol, ts, nothing, idx, state)
-_timeseries(sol, ts, p, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p, idx, state)) for t in ts], "$state @ $idx")
+_timeseries(sol, p::PRecord, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p(t), idx, state)) for t in ts], "$state @ $idx")
+_timeseries(sol, p, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p, idx, state)) for t in ts], "$state @ $idx")
 
 set_ts_dtmax(dt) = VirtualInertia.TS_DTMAX[] = dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)
@@ -199,7 +198,7 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX[])
     if p==nothing && sol.prob.p !==nothing
         p = sol.prob.p
         if p !== SciMLBase.NullParameters()
-            # @warn "I am using the p from the problem $p to recover states. Be carefull, this might be wrong afer callbacks."
+            @warn "I am using the p from the problem to recover states. Be carefull, this might be wrong afer callbacks."
         end
     end
 
@@ -220,7 +219,7 @@ function timeseries(sol, p, idx::Int, state; dtmax=TS_DTMAX[])
             end
         end
     end
-    _timeseries(sol, ts, p, idx, state)
+    _timeseries(sol, p, ts, idx, state)
 end
 
 function meanseries(sol, idxs, state; dtmax=TS_DTMAX[])
