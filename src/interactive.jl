@@ -205,9 +205,8 @@ function inspect_solution(sol, network)
 end
 
 function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin], sol.t[end])))
-    fig = Figure(resolution=(800, 600))
+    fig = Figure(resolution=(1000, 800))
 
-    ax = Axis(fig[2, 1])
     symgrid = fig[1,1] = GridLayout(tellwidth=false, tellheight=true)
     buttons = symgrid[1,1:5] = [Button(fig, label="_ω"),
                                 Button(fig, label="_u_arg"),
@@ -228,6 +227,20 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
     on(symbox.stored_string) do s
         sym[] = Symbol(s)
     end
+
+    ## add menus
+    menugrid = fig[2,1] = GridLayout(tellwidth=false, tellheight=true)
+    menus = menugrid[1,1:6] = states_dropdown(fig, sol, sel_nodes)
+    for menu in filter(m -> m isa Menu, menus)
+        on(menu.selection) do sel
+            if sel isa String
+                symbox.displayed_string[] = sel
+                symbox.stored_string[] = sel
+            end
+        end
+    end
+
+    ax = Axis(fig[3, 1])
 
     plots = Dict{Int, Lines}()
 
@@ -292,6 +305,30 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
     register_interaction!(set_time_interaction, ax, :set_time)
 
     fig
+end
+
+function states_dropdown(fig, sol, sel_nodes)
+    DEFAULT = "(no option)"
+    states = Observable(String[DEFAULT])
+    rem_states = Observable(String[DEFAULT])
+    meas_states = string.(blockstates(sol, 1; print=false).meas_states)
+    on(sel_nodes; update=true) do idxs
+        if !isempty(idxs)
+            nt = _common_states(sol, idxs)
+            states[] = isempty(nt.states) ? [DEFAULT] : string.(nt.states)
+            rem_states[] = isempty(nt.rem_states) ? [DEFAULT] : string.(nt.rem_states)
+        else
+            states[] = [DEFAULT]
+            rem_states[] = [DEFAULT]
+        end
+    end
+    l1 = Label(fig, "Common:"; tellwidth=true)
+    m1 = Menu(fig; options=meas_states)
+    l2 = Label(fig, "States:"; tellwidth=true)
+    m2 = Menu(fig; options=states)
+    l3 = Label(fig, "Removed:"; tellwidth=true)
+    m3 = Menu(fig; options=rem_states)
+    return [l1, m1, l2, m2, l3, m3]
 end
 
 function register_keyboard_interaction!(fig, tslider)

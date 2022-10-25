@@ -7,32 +7,63 @@ export blockstates, getstate, timeseries, meanseries
 export NADIR, ROCOF, needed_storage
 
 const TS_DTMAX = Ref(0.01)
-const MEAS_STATES = [:_ω, :_δ, :_rocof, :_P, :_Q]
+const MEAS_STATES = [:_ω, :_rocof, :_P, :_Q]
 const MEAS_STATES_COMPLEX = [:_u, :_i, :_S]
+const COMPLEX_ENDINGS_CART = ["_r", "_i"]
+const COMPLEX_ENDINGS_POL = ["_mag", "_arg"]
 
-blockstates(sol, idx) = blockstates(sol.prob.f, idx)
-function blockstates(nd::ODEFunction, idx)
+blockstates(sol::ODESolution, idx; print=true) = blockstates(sol.prob.f, idx; print)
+function blockstates(nd::ODEFunction, idx; print=true, polar=true)
     wrp = _getwrapper(nd,idx)
 
-    println("Actual States")
     states = _group_states(wrp.states)
-    for (s, c) in zip(states, treesyms(states))
-        println(" $c $s")
-    end
-    println("Removed States")
-    states = _group_states(wrp.rem_states)
-    for (s, c) in zip(states, treesyms(states))
-        println(" $c $s")
-    end
-    println("Measured States (available for all nodes)")
-    for (s, c) in zip(MEAS_STATES_COMPLEX, treesyms(length(MEAS_STATES_COMPLEX) + 1))
-        println(" $c Complex: $s")
-    end
-    for (s, c) in zip(MEAS_STATES, treesyms(length(MEAS_STATES)))
-        println(" $c $s")
+    remstates = _group_states(wrp.rem_states)
+    measstates = [MEAS_STATES, MEAS_STATES_COMPLEX]
+
+    if print
+        println("Actual States")
+        sstates = _stringify(states...)
+        for (s, c) in zip(sstates, treesyms(sstates))
+            println(" $c $s")
+        end
+        println("Removed States")
+        sstates = _stringify(remstates...)
+        for (s, c) in zip(sstates, treesyms(sstates))
+            println(" $c $s")
+        end
+        println("Measured States (available for all nodes)")
+        sstates = _stringify(measstates...)
+        for (s, c) in zip(sstates, treesyms(sstates))
+            println(" $c $s")
+        end
+        println("All complex states can be used with _r, _i, _mag, _arg, _a, _b, _c suffix")
+        return nothing
     end
 
-    println("All complex states can be used with _r, _i, _mag, _arg, _a, _b, _c suffix")
+    cmplx_endings = if polar
+        COMPLEX_ENDINGS_POL
+    else
+        COMPLEX_ENDINGS_CART
+    end
+    for s in (states, remstates, measstates)
+        s[2] = Symbol.(sort!(mapreduce(t->t[1]*t[2], vcat, Iterators.product(string.(s[2]), cmplx_endings))))
+        append!(s[2], s[1])
+    end
+    return (;states=states[2], rem_states=remstates[2], meas_states=measstates[2])
+end
+
+function _common_states(sol, idxs)
+    idxs = collect(idxs)
+    nt = blockstates(sol, idxs[1]; print=false)
+    states = Set{Symbol}(nt.states)
+    rem = Set{Symbol}(nt.rem_states)
+    meas = nt.meas_states
+    for i in idxs[2:end]
+        nt = blockstates(sol, i; print=false)
+        intersect!(states, nt.states)
+        intersect!(rem, nt.rem_states)
+    end
+    return (; states=sort!(collect(states)), rem_states=sort!(collect(rem)), meas_states=meas)
 end
 
 function _getwrapper(nd, idx)
@@ -56,10 +87,17 @@ function _group_states(states)
             end
         end
     end
-    wocomplex = sort!(filter(s -> s ∉ complex_pairs .* "_r" ∪ complex_pairs .* "_i", states))
-    complex = sort!(replace.(complex_pairs, r"^(.*)$" => s"Complex: \1"))
-    append!(complex, wocomplex)
+    real = Symbol.(sort!(filter(s -> s ∉ complex_pairs .* "_r" ∪ complex_pairs .* "_i", states)))
+    complex = Symbol.(complex_pairs)
+    [real, complex]
 end
+
+function _stringify(real, complex)
+    complex = replace.(string.(complex), r"^(.*)$" => s"Complex: \1")
+    append!(complex, string.(real))
+end
+
+
 
 @nospecialize
 function getstate(sol, t::Number, idxs, state)
