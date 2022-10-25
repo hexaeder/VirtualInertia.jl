@@ -84,14 +84,24 @@ function inspect_solution(sol, network)
     bottom_sg = SliderGrid(fig[4,1],
                            (label = "Node color scaling", range=Base.range(-10, 0, length=100), startvalue=0, format=x->@sprintf("%.2E", 10^x)),
                            (label = "Time", range=Base.range(sol.t[begin], sol.t[end], length=1000), startvalue=sol.t[begin], format=x->@sprintf("%.4f s", x)))
+
+    # return bottom_sg
     tslider = bottom_sg.sliders[2]
     t = Observable(0.0)
     connect!(t, tslider.value)
-    on(t) do obs_t
-        if !isapprox(obs_t, tslider.value[])
-            set_close_to!(tslider, obs_t)
-        end
-    end
+
+    # hacky way to add another slider
+    tinterval_slider = bottom_sg.layout[3, 2] = IntervalSlider(fig; range=tslider.range, tellheight=true)
+    bottom_sg.layout[3, 1] = Label(fig, @lift(@sprintf("%.4f s", $(tinterval_slider.interval)[1])); tellheight=true, halign=:right)
+    bottom_sg.layout[3, 3] = Label(fig, @lift(@sprintf("%.4f s", $(tinterval_slider.interval)[2])); tellheight=true, halign=:left)
+
+    # on(tinterval_slider.interval) do interval
+    #     if t[] < interval[1]
+    #         set_close_to!(tslider, interval[1])
+    #     elseif t[] > interval[2]
+    #         set_close_to!(tslider, interval[2])
+    #     end
+    # end
 
     # t = tslider.value
     ncolorscale=@lift 10^$(bottom_sg.sliders[1].value)
@@ -181,38 +191,20 @@ function inspect_solution(sol, network)
     #####
     ##### Keyboard interaction for time
     #####
-    steps = 1
-    on(fig.scene.events.keyboardbutton) do e
-        if e.key == Keyboard.left_shift || e.key == Keyboard.right_shift
-            if e.action == Keyboard.press
-                steps = 10
-            elseif e.action == Keyboard.release
-                steps = 1
-            end
-        elseif e.action == Keyboard.press || e.action == Keyboard.repeat
-            if e.key == Keyboard.left
-                mv_slider(tslider, -steps)
-                return true
-            elseif e.key == Keyboard.right
-                mv_slider(tslider, steps)
-                return true
-            end
-        end
-        return false
-    end
+    register_keyboard_interaction!(fig, tslider)
 
     #####
     ##### Open node plots in new windows
     #####
     on(nselectors[3].clicks) do n
-        f = nodeplot_window(sol, t, sel_nodes)
+        f = nodeplot_window(sol, tslider, sel_nodes; tlims=tinterval_slider.interval)
         sc = display(GLMakie.Screen(), f)
     end
 
     fig
 end
 
-function nodeplot_window(sol, t, sel_nodes; tlims=Observable((sol.t[begin], sol.t[end])))
+function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin], sol.t[end])))
     fig = Figure(resolution=(800, 600))
 
     ax = Axis(fig[2, 1])
@@ -242,7 +234,7 @@ function nodeplot_window(sol, t, sel_nodes; tlims=Observable((sol.t[begin], sol.
     on(sym; update=true) do sym
         empty!(ax)
         empty!(plots)
-        Makie.vlines!(ax, t; color=:black)
+        Makie.vlines!(ax, tslider.value; color=:black)
     end
 
     on(tlims, update=true) do lims
@@ -285,19 +277,43 @@ function nodeplot_window(sol, t, sel_nodes; tlims=Observable((sol.t[begin], sol.
     symbox.displayed_string[] = string(sym[])
     symbox.stored_string[] = string(sym[])
 
+    # arrows to move time
+    register_keyboard_interaction!(fig, tslider)
+
     # click to set time
     set_time_interaction = (event::MouseEvent, axis) -> begin
         if event.type === MouseEventTypes.leftclick
             pos = mouseposition(axis.scene)[1]
-            t[] = pos
+            set_close_to!(tslider, pos)
             return true
         end
         return false
     end
-
     register_interaction!(set_time_interaction, ax, :set_time)
 
     fig
+end
+
+function register_keyboard_interaction!(fig, tslider)
+    steps = 1
+    on(fig.scene.events.keyboardbutton) do e
+        if e.key == Keyboard.left_shift || e.key == Keyboard.right_shift
+            if e.action == Keyboard.press
+                steps = 10
+            elseif e.action == Keyboard.release
+                steps = 1
+            end
+        elseif e.action == Keyboard.press || e.action == Keyboard.repeat
+            if e.key == Keyboard.left
+                mv_slider(tslider, -steps)
+                return true
+            elseif e.key == Keyboard.right
+                mv_slider(tslider, steps)
+                return true
+            end
+        end
+        return false
+    end
 end
 
 function mv_slider(slider, steps=1)

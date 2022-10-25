@@ -127,7 +127,7 @@ cb = PresetTimeCallback(0.1, affect)
 
 tspan = (0, 0.25)
 prob = ODEProblem(nd, u0, tspan, params; callback=cb)
-sol = solve(prob, Rodas4());
+sol = solve(prob, Rodas4(); dtmax=0.001);
 
 
 inspect_solution(sol, network)

@@ -115,7 +115,7 @@ function getstate(sol, t::Number, p, idx::Integer, state; err=true)
         u_dot_r, u_dot_i = dvstate[1:2]
         return -(u_i*u_dot_r - u_r*u_dot_i)/(u_i^2 + u_r^2)
     elseif state==:_rocof
-        h = 0.005
+        h = 0.001
         t1 = t-h < sol.t[begin] ? t : t-h
         t2 = t+h < sol.t[begin] ? t : t+h
         ω1 = getstate(sol, t1, p, idx, :_ω; err)
