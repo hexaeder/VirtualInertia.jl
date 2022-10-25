@@ -223,9 +223,20 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
         end
     end
 
-    sym = Observable(:_ω)
+    syms = Observable([:_ω])
     on(symbox.stored_string) do s
-        sym[] = Symbol(s)
+        if occursin(r"^\s*$", s)
+            syms[] = Symbol[]
+        else
+            try
+                @show "Update string" s
+                parts = split(s, ',')
+                parts = replace.(parts, r"\s"=>s"")
+                syms[] = Symbol.(parts)
+            catch e
+                @warn "Parsing error of $s"
+            end
+        end
     end
 
     ## add menus
@@ -233,6 +244,7 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
     menus = menugrid[1,1:6] = states_dropdown(fig, sol, sel_nodes)
     for menu in filter(m -> m isa Menu, menus)
         on(menu.selection) do sel
+            @debug "Menu Selection" sel
             if sel isa String
                 symbox.displayed_string[] = sel
                 symbox.stored_string[] = sel
@@ -242,9 +254,10 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
 
     ax = Axis(fig[3, 1])
 
-    plots = Dict{Int, Lines}()
+    plots = Dict{Int, Any}()
 
-    on(sym; update=true) do sym
+    on(syms; update=true) do syms
+        @debug "Syms chagned to $syms, clear all."
         empty!(ax)
         empty!(plots)
         Makie.vlines!(ax, tslider.value; color=:black)
@@ -255,23 +268,36 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
     end
 
     legend = nothing
-    onany(sel_nodes, sym) do selected, sym
+    onany(sel_nodes, syms) do selected, syms
         added   = setdiff(selected, keys(plots))
         removed = setdiff(keys(plots), selected)
         for i in added
-            try
-                ts = timeseries(sol, i, sym)
-                p = lines!(ax, ts; label=string(i), linewidth=3)
-                plots[i] = p
-            catch e
-                # variable not found
+            plist = []
+            for (isym, s) in enumerate(syms)
+                try
+                    ts = timeseries(sol, i, s)
+                    p = lines!(ax, ts;
+                               label=string(s)*" @ "*string(i),
+                               linewidth=3,
+                               color=Cycled(i),
+                               linestyle=ax.palette.linestyle[][isym])
+                    push!(plist, p)
+                    @debug "Added plot $s for node $i"
+                catch e
+                    @debug "Could not plot $s for node $i" e
+                    # variable not found
+                end
             end
+            plots[i] = plist
         end
         for i in removed
-            p = plots[i]
+            plist = plots[i]
             delete!(plots, i)
-            delete!(ax, p)
+            for p in plist
+                delete!(ax, p)
+            end
         end
+        #= TODO: Legend broken
         if !(isempty(added) && isempty(removed))
             if !isnothing(legend)
                 # legend.width[] = 0
@@ -281,14 +307,16 @@ function nodeplot_window(sol, tslider, sel_nodes; tlims=Observable((sol.t[begin]
             end
             # isnothing(legend) || delete!(legend)
             if !isempty(plots)
-                # legend = Legend(fig[2,2], ax, ":"*string(sym)*" at nodes:"; bgcolor=:white)
+                # legend = Legend(fig[2,2], ax, ":"*string(syms)*" at nodes:"; bgcolor=:white)
             end
             # display(GLMakie.Screen(fig.scene), fig)
         end
+        =#
     end
 
-    symbox.displayed_string[] = string(sym[])
-    symbox.stored_string[] = string(sym[])
+    # initialize box
+    symbox.displayed_string[] = string(syms[][1])
+    symbox.stored_string[] = string(syms[][1])
 
     # arrows to move time
     register_keyboard_interaction!(fig, tslider)
