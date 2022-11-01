@@ -51,6 +51,21 @@ function Slack()
     slackblock = IOBlock([dt(u_r) ~ 0, dt(u_i) ~ 0], [], [u_r, u_i]; name=:slack)
 end
 
+function SwingEquation(; params...)
+    @variables t ω(t) δ(t) P_el(t) u_r(t) u_i(t)
+    @parameters i_r(t) i_i(t) P_ref D H ω0 u_mag
+    dt = Differential(t)
+
+    @named swing = IOBlock([P_el ~ i_i*u_i + i_r*u_r,
+                            dt(ω) ~ ω0/(2*H) * (P_ref - P_el - D*ω),
+                            dt(δ) ~ ω,
+                            u_r ~ u_mag * cos(δ),
+                            u_i ~ u_mag * sin(δ)],
+                           [i_r, i_i], [u_r, u_i])
+    swing = substitute_algebraic_states(swing)
+    swing = replace_vars(swing, params)
+end
+
 function ConstPLoad(;params...)
     @variables t P_meas(t) Q_meas(t) u_r(t) u_i(t)
     @parameters P_ref i_r(t) i_i(t)

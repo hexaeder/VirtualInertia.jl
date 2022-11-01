@@ -105,6 +105,9 @@ function getstate(sol, t::Number, p, idxs, state)
 end
 
 function getstate(sol, t::Number, p, idx::Integer, state; err=true)
+    if p isa PRecord
+        p = p(t)
+    end
     nd = sol.prob.f
     x = sol(t)
     gd = nd(x, p, t, GetGD)
@@ -153,7 +156,8 @@ function getstate(sol, t::Number, p, idx::Integer, state; err=true)
         return -(u_i*u_dot_r - u_r*u_dot_i)/(u_i^2 + u_r^2)
     elseif state==:_rocof
         h = 0.001
-        t1 = t-h < sol.t[begin] ? t : t-h
+        # t1 = t-h < sol.t[begin] ? t : t-h
+        t1 = t
         t2 = t+h < sol.t[begin] ? t : t+h
         ω1 = getstate(sol, t1, p, idx, :_ω; err)
         ω2 = getstate(sol, t2, p, idx, :_ω; err)
