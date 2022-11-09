@@ -1,4 +1,8 @@
 using Test
+using VirtualInertia
+using NetworkDynamics
+using OrdinaryDiffEq
+using Graphs
 
 @testset "test _group_states" begin
     using VirtualInertia: _group_states
@@ -10,14 +14,14 @@ using Test
 end
 
 @testset "getstate" begin
-    load = ODEVertex(ConstLoad(Q_load=0,P_load = -1))
+    load = ODEVertex(VirtualInertia.ConstLoad(Q_load=0,P_load = -1))
     droopPT1 = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
                          VirtualInertia.DroopControl(Q_ref=0, P_ref=1,
                                              V_ref=1, ω_ref=0,
                                              τ_P=0.01, K_P=0.1,
                                              τ_Q=0.01, K_Q=0.1))
 
-    rmsedge = RMSPiLine(R=0, L=ustrip(Lline), C1=ustrip(Cline/2), C2=ustrip(Cline/2))
+    rmsedge = RMSPiLine(R=0, L=0.04, C1=1, C2=1)
 
     g = complete_graph(2)
     nd = network_dynamics([load, droopPT1], rmsedge, g)
