@@ -66,6 +66,7 @@ function _common_states(sol, idxs)
     return (; states=sort!(collect(states)), rem_states=sort!(collect(rem)), meas_states=meas)
 end
 
+_getwrapper(sol::ODESolution, idx) = _getwrapper(sol.prob.f, idx)
 function _getwrapper(nd, idx)
     ndobj = nd.f
     _group = findfirst(group -> idx ∈ group, ndobj.unique_v_indices)
@@ -193,8 +194,21 @@ struct TimeSeries
     name::String
 end
 
-_timeseries(sol, p::PRecord, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p(t), idx, state)) for t in ts], "$state @ $idx")
-_timeseries(sol, p, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p, idx, state)) for t in ts], "$state @ $idx")
+Base.getindex(ts::TimeSeries, i) = ts.x[i]
+Base.length(ts::TimeSeries) = length(ts.x)
+Base.firstindex(ts::TimeSeries) = firstindex(ts.x)
+Base.lastindex(ts::TimeSeries) = lastindex(ts.x)
+
+function _blockname(sol, idx)
+    try
+        return " ("*_getwrapper(sol, idx).name*")"
+    catch
+    end
+    return ""
+end
+
+_timeseries(sol, p::PRecord, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p(t), idx, state)) for t in ts], "$state @ $idx"*_blockname(sol,idx))
+_timeseries(sol, p, ts, idx::Int, state) = TimeSeries(collect(ts), [Float32(getstate(sol, t, p, idx, state)) for t in ts], "$state @ $idx"*_blockname(sol,idx))
 
 set_ts_dtmax(dt) = VirtualInertia.TS_DTMAX[] = dt
 timeseries(sol, idx::Int, state; kwargs...) = timeseries(sol, nothing, idx, state; kwargs...)

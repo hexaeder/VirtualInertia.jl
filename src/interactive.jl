@@ -11,7 +11,7 @@ using GraphMakie.NetworkLayout: spring
 
 export inspect_solution
 
-function inspect_solution(sol, network, precord::PRecord)
+function inspect_solution(sol, network=sol.prob.f.f.graph, precord=PRecord(sol.prob))
     fig = Figure(resolution = (1200, 1200))
     ####
     #### selector grid to control plot
@@ -408,7 +408,7 @@ end
 
 function gparguments(sol::ODESolution,
                      precord::PRecord,
-                     network::MetaGraph;
+                     network;
                      t::Observable,
                      nstatesym,
                      ncolorrange,
@@ -418,8 +418,18 @@ function gparguments(sol::ODESolution,
 
     NV = nv(network)
 
-    markdict = Dict(:load => :rect, :gen => :circle, :syncon => :circle);
-    node_marker = [markdict[k] for k in get_prop(network, 1:NV, :type)];
+    node_marker = try
+        markdict = Dict(:load => :rect, :gen => :circle, :syncon => :circle);
+        [markdict[k] for k in get_prop(network, 1:NV, :type)];
+    catch
+        markerset = [:circle, :rect, :utriangle, :cross, :diamond, :dtriangle, :pentagon, :xcross]
+        groups = sol.prob.f.f.unique_v_indices
+        markers = Vector{Symbol}(undef, nv(network))
+        for (i,g) in enumerate(groups)
+            markers[g] .= markerset[i]
+        end
+        markers
+    end
 
     u0statevec = Observable(Vector{Float64}(undef, NV))
     onany(nstatesym, rel_to_u0) do nstatesym, rel
@@ -471,6 +481,7 @@ function gparguments(sol::ODESolution,
             node_attr=(;colorrange=ncolorrange, colormap=ncolorscheme));
 end
 
+read_pos_or_spring(g) = spring(g)
 function read_pos_or_spring(g::MetaGraph)
     pos = get_prop(g, 1:nv(g), :pos)
     if any(ismissing.(pos))

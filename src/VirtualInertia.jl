@@ -14,15 +14,16 @@ struct CallableBlockWrapper{F,G}
     inputs::Vector{Symbol}
     rem_states::Vector{Symbol}
     params::Vector{Symbol}
+    name::String
 end
-function CallableBlockWrapper(gen)
+function CallableBlockWrapper(gen, name="")
     f_ip = gen.f_ip
     g_oop = gen.g_oop
     states = map(s->s.name, gen.states)
     inputs = map(s->s.name, gen.inputs)
     rem_states = map(s->s.name, gen.rem_states)
     params = map(s->s.name, gen.params)
-    CallableBlockWrapper{typeof(f_ip), typeof(g_oop)}(f_ip,g_oop,states,inputs,rem_states,params)
+    CallableBlockWrapper{typeof(f_ip), typeof(g_oop)}(f_ip,g_oop,states,inputs,rem_states,params,string(name))
 end
 (cbw::CallableBlockWrapper)(du,u,edges,p,t) = cbw.f_ip(du,u,flowsum(edges),p,t)
 
@@ -49,7 +50,7 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_params=p_order,
                                    type=:ode,
                                    warn=false)
-        f = CallableBlockWrapper(gen)
+        f = CallableBlockWrapper(gen, iob.name)
     elseif fulfills(iob, BlockSpec([], [:u_r, :u_i]))
         # slack node does not need to know the flowsum
         gen = generate_io_function(iob;
@@ -57,7 +58,7 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
                                    f_inputs=[],
                                    f_params=p_order,
                                    type=:ode)
-        f = CallableBlockWrapper(gen)
+        f = CallableBlockWrapper(gen, iob.name)
     else
         error("The block should have outputs u_r and u_i. The inputs should be either i_r and i_i or empty (in case of a slack).")
     end
