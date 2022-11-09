@@ -10,7 +10,7 @@ using Test
 end
 
 @testset "getstate" begin
-    load = ODEVertex(ConstPLoad(P_ref = -1))
+    load = ODEVertex(ConstLoad(Q_load=0,P_load = -1))
     droopPT1 = ODEVertex(VirtualInertia.PT1Source(τ=0.001),
                          VirtualInertia.DroopControl(Q_ref=0, P_ref=1,
                                              V_ref=1, ω_ref=0,
@@ -26,19 +26,19 @@ end
     sol = solve(prob, Rodas4())
 
     blockstates(sol, 1)
-    getstate(sol, 0.0, 1, :u_r)
-    getstate(sol, 0.0, 1, :_u_r)
-    getstate(sol, 0.0, 1, :u_i)
-    getstate(sol, 0.0, 1, :_u_i)
-    getstate(sol, 0.0, 1, :u_mag)
-    getstate(sol, 0.0, 1, :_u_mag)
-    getstate(sol, 0.0, 1, :u_arg)
-    getstate(sol, 0.0, 1, :_u_arg)
+    getstate(sol, 0.0,nothing, 1, :u_r)
+    getstate(sol, 0.0,nothing, 1, :_u_r)
+    getstate(sol, 0.0,nothing, 1, :u_i)
+    getstate(sol, 0.0,nothing, 1, :_u_i)
+    getstate(sol, 0.0,nothing, 1, :u_mag)
+    getstate(sol, 0.0,nothing, 1, :_u_mag)
+    getstate(sol, 0.0,nothing, 1, :u_arg)
+    getstate(sol, 0.0,nothing, 1, :_u_arg)
 
-    getstate(sol, 0.0, 1, :_P)
-    getstate(sol, 0.0, 1, :_Q)
-    getstate(sol, 0.0, 1, :_ω)
-    getstate(sol, 0.0, 1, :_rocof)
-    getstate(sol, 0.0, 1, :_u_a)
-    getstate(sol, 0.0, 1, :_i_mag)
+    getstate(sol, 0.0,nothing, 1, :_P)
+    getstate(sol, 0.0,nothing, 1, :_Q)
+    getstate(sol, 0.0,nothing, 1, :_ω)
+    getstate(sol, 0.0,nothing, 1, :_rocof)
+    getstate(sol, 0.0,nothing, 1, :_u_a)
+    getstate(sol, 0.0,nothing, 1, :_i_mag)
 end

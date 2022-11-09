@@ -32,6 +32,7 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+PlotReferenceTests = "a984a077-506c-40d4-a937-a439d466ab74"
 
 [compat]
 BlockSystems = "0.4.4"
@@ -59,4 +60,4 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Plots"]
+test = ["Test", "SafeTestsets", "Plots", "PlotReferenceTests"]

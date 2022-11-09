@@ -62,8 +62,8 @@ function DroopControl(; params...)
 
     refgen = Components.VRefGen()
 
-    @named droopctrl = IOSystem(:autocon, [PQmeas, Psys, Qsys, refgen], outputs=:remaining)
-    con = connect_system(droopctrl)
+    @named droop = IOSystem(:autocon, [PQmeas, Psys, Qsys, refgen], outputs=:remaining)
+    con = connect_system(droop)
 
     return replace_vars(con, params)
 end
@@ -129,7 +129,7 @@ function PT1Source(; params...)
 
     ui_meas = Components.UIMeas()
 
-    @connect PT1source.(u_r, u_i) => ui_meas.(u_r, u_i) name=:PT1Source
+    @connect PT1source.(u_r, u_i) => ui_meas.(u_r, u_i) name=:PT1Src
 end
 
 """
@@ -147,5 +147,5 @@ function PerfectSource(; params...)
 
     ui_meas = Components.UIMeas()
 
-    @connect Vsource.(u_r, u_i) => ui_meas.(u_r, u_i) name=:PT1Source
+    @connect Vsource.(u_r, u_i) => ui_meas.(u_r, u_i) name=:VSrc
 end

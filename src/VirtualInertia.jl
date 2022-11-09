@@ -103,8 +103,6 @@ function BusBar(injectors...; name=:Bus, verbose=false, autopromote=false, EMT=t
 
     if EMT
         @parameters C ω0
-        # @named bar = IOBlock([dt(u_r) ~  ω0*u_i - 1/C * (addall(ir...) + i_r),
-        #                       dt(u_i) ~ -ω0*u_r - 1/C * (addall(ii...) + i_i)],
         @named bar = IOBlock([dt(u_r) ~ -ω0*u_i + 1/C * (addall(ir...) + i_r),
                               dt(u_i) ~  ω0*u_r + 1/C * (addall(ii...) + i_i)],
                              [i_r, i_i, ir..., ii...],

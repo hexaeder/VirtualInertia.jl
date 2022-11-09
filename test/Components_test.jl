@@ -4,6 +4,8 @@ using BlockSystems
 import Plots
 using OrdinaryDiffEq
 import Random
+using PlotReferenceTests
+set_reference_dir(VirtualInertia)
 
 @testset "ReducedPLL" begin
     rng = Random.MersenneTwister(1)
@@ -46,11 +48,10 @@ import Random
     sol = solve(prob, Rodas4())
 
     Plots.plot(sol.t, sol[:ω_pll]; label="tracked freq")
-    Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
-    Plots.ylims!(-.1,.1)
+    @reftest "ReducedPLL_tracking_1" Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
 
     Plots.plot(sol.t, sol[:δ_pll]; label="tracked arg")
-    Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
+    @reftest "ReducedPLL_tracking_2" Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
 end
 
 @testset "KauraPLL" begin
@@ -96,11 +97,10 @@ end
     sol = solve(prob, Rodas4())
 
     Plots.plot(sol.t, sol[:ω_pll]; label="tracked freq")
-    Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
-    Plots.ylims!(-.1,.1)
+    @reftest "KauraPLL_tracking_1" Plots.plot!(t->0.1*cos(0.5*t)*0.5; label="input freq")
 
     Plots.plot(sol.t, sol[:δ_pll]; label="tracked arg")
-    Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
+    @reftest "KauraPLL_tracking_2" Plots.plot!(t->0.1*sin(0.5*t); label="input arg")
 end
 
 @testset "PT1CurrentSource" begin
@@ -119,7 +119,7 @@ end
     tspan = (0,2)
     prob = ODEProblem(f,u0,tspan)
     sol = solve(prob, Rodas4())
-    Plots.plot(sol)
+    @reftest "PT1_current_source" Plots.plot(sol)
 end
 
 @testset "PerfectCurrentSource" begin

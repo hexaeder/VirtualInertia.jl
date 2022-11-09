@@ -19,7 +19,7 @@ function RMSPiLine(; L, R, C1, C2)
     end
 end
 
-function BSPiLine(; p_order=[], params...)
+function BSPiLine(; params...)
     @variables t i_src_r(t) i_src_i(t) i_dst_r(t) i_dst_i(t)
     @parameters u_src_r(t) u_src_i(t) u_dst_r(t) u_dst_i(t) R X B_src B_dst
     lineblock = IOBlock([i_src_r ~ real(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
@@ -66,22 +66,9 @@ function SwingEquation(; params...)
     swing = replace_vars(swing, params)
 end
 
-function ConstPLoad(;params...)
-    @variables t P_meas(t) Q_meas(t) u_r(t) u_i(t)
-    @parameters P_ref i_r(t) i_i(t)
-    loadblock = IOBlock([P_meas ~ -u_r*i_r - u_i*i_i,
-                         Q_meas ~ -i_r*u_i + i_i*u_r,
-                         0 ~ Q_meas,
-                         0 ~ P_ref - P_meas],
-                        [i_r, i_i], [u_r, u_i],
-                        name=:load)
-    loadblock = substitute_algebraic_states(loadblock)
-    loadblock = replace_vars(loadblock, params)
-end
-
 function ConstLoad(;EMT=false, params...)
     cs = Components.PerfectCurrentSource(;name=:load_cs, P=:P_load, Q=:Q_load)
-    bus = BusBar(cs; name=:pt1load, autopromote=true, EMT)
+    bus = BusBar(cs; name=:constload, autopromote=true, EMT)
     bus = replace_vars(bus, params)
 end
 
@@ -114,7 +101,7 @@ function SecondaryControlCS_PI(; EMT=false, params...)
                             globalp=[:u_r, :u_i])
     pisrc = connect_system(pisrc)
 
-    bus = BusBar(pisrc; autopromote=true, EMT)
+    bus = BusBar(pisrc; name=:SecCtrlPI, autopromote=true, EMT)
     bus = replace_vars(bus, params)
 end
 
@@ -127,6 +114,6 @@ function SecondaryControlCS_PT1(; EMT=false, params...)
 
     cs = @connect lpf.P_ref_int => cs.P_ref_int outputs=:remaining name=:cs
 
-    bus = BusBar(cs; autopromote=true, EMT)
+    bus = BusBar(cs; name=:SecCtrlPT1, autopromote=true, EMT)
     bus = replace_vars(bus, params)
 end
