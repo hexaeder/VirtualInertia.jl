@@ -150,14 +150,16 @@ end
     UIMeas(; name=:uimeas, renamings...)
 
 Creates a very simple block which is mainly there for renaiming.
+
+TODO: is this necessary? Maybe make i_i and i_r "globalp" inputs
 """
 function UIMeas(; name=:ui_meas, renamings...)
     @variables t u_meas_r(t) u_meas_i(t) i_meas_r(t) i_meas_i(t)
     @parameters u_r(t) u_i(t) i_i(t) i_r(t)
     block = IOBlock([u_meas_r ~ u_r,
                      u_meas_i ~ u_i,
-                     i_meas_r ~ -i_r,
-                     i_meas_i ~ -i_i],
+                     i_meas_r ~ i_r,
+                     i_meas_i ~ i_i],
                     [u_r, u_i, i_r, i_i],
                     [u_meas_r, u_meas_i, i_meas_r, i_meas_i];
                     name)

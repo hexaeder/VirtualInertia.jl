@@ -8,6 +8,7 @@ using NetworkDynamics
 using Graphs
 using DiffEqCallbacks
 using Unitful
+BlockSystems.WARN_SIMPLIFY[] = false
 
 using PlotReferenceTests
 set_reference_dir(VirtualInertia)
@@ -177,6 +178,22 @@ end
     line1.f(e1, v_src, v_dst, nothing, 0.0)
     line2.f(e2, v_src, v_dst, nothing, 0.0)
     @test e1 ≈ e2
+
+    # compare line to power dynamics line (taken from PiModeLine tests)
+    y=10*im; y_shunt_km=10*im; y_shunt_mk=100*im
+    X = imag(1/y)
+    R = real(1/y)
+    B_src = imag(y_shunt_km)
+    B_dst = imag(y_shunt_mk)
+    line1 = RMSPiLine(;L=X/(2π*50), R, C1=B_src/(2π*50), C2=B_dst/(2π*50))
+    line2 = StaticEdge(BSPiLine(; R, X, B_src, B_dst))
+    e1 = zeros(4)
+    e2 = zeros(4)
+    v_s = [10; 5]
+    v_d = [12; 2]
+    line1.f(e1, v_s, v_d, nothing, 0)
+    line2.f(e2, v_s, v_d, nothing, 0)
+    @test e2 == [-170.0, 1220.0, -80.0, 80.0]
 end
 
 @testset "PT1 and const Load" begin

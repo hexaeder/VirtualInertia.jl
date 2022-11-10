@@ -174,7 +174,7 @@ function getstate(sol, t::Number, p, idx::Integer, state; err=true)
     elseif state==:_S
         u_r, u_i = vstate[1:2]
         i_r, i_i = flowsum(get_dst_edges(gd, idx))
-        return (u_r + im*u_i)*(-i_r + im*i_i)
+        return (u_r + im*u_i)*(i_r - im*i_i)
     elseif state==:_P || state==:_S_r
         return real(getstate(sol, t, p, idx, :_S; err))
     elseif state==:_Q || state==:_S_i

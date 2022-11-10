@@ -10,10 +10,10 @@ function RMSPiLine(; L, R, C1, C2)
             iC2 = Vdst*im*ω*C2
             isrc = - (imain + iC1) # positiv current means flow to node
             idst = imain - iC2
-            u[1] = real(idst)
-            u[2] = imag(idst)
-            u[3] = real(isrc)
-            u[4] = imag(isrc)
+            u[1] = -real(idst)
+            u[2] = -imag(idst)
+            u[3] = -real(isrc)
+            u[4] = -imag(isrc)
         end
         StaticEdge(f=edgef, dim=4, coupling=:fiducial, sym=[:i_dst_r,:i_dst_i, :i_src_r, :i_src_i])
     end
@@ -22,10 +22,10 @@ end
 function BSPiLine(; params...)
     @variables t i_src_r(t) i_src_i(t) i_dst_r(t) i_dst_i(t)
     @parameters u_src_r(t) u_src_i(t) u_dst_r(t) u_dst_i(t) R X B_src B_dst
-    lineblock = IOBlock([i_src_r ~ real(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
-                         i_src_i ~ imag(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
-                         i_dst_r ~ real( (u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i)),
-                         i_dst_i ~ imag( (u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i))],
+    lineblock = IOBlock([i_src_r ~ -real(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
+                         i_src_i ~ -imag(-(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_src)*(u_src_r + im*u_src_i)),
+                         i_dst_r ~ -real(+(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i)),
+                         i_dst_i ~ -imag(+(u_src_r + im*u_src_i - u_dst_r - im*u_dst_i)/(R + im*X) - (im*B_dst)*(u_dst_r + im*u_dst_i))],
                         [u_src_r, u_src_i, u_dst_r, u_dst_i],
                         [i_src_r, i_src_i, i_dst_r, i_dst_i];
                         name=:PiLine)
@@ -36,8 +36,8 @@ function EMTRLLine(; params...)
     @variables t i_r(t) i_i(t)
     @parameters u_src_r(t) u_src_i(t) u_dst_r(t) u_dst_i(t) R L ω0
     dt = Differential(t)
-    lineblock = IOBlock([dt(i_r) ~  ω0 * i_i  - R/L * i_r + 1/L*(u_src_r - u_dst_r),
-                         dt(i_i) ~ -ω0 * i_r  - R/L * i_i + 1/L*(u_src_i - u_dst_i)],
+    lineblock = IOBlock([dt(i_r) ~  ω0 * i_i  - R/L * i_r + 1/L*(u_dst_r - u_src_r),
+                         dt(i_i) ~ -ω0 * i_r  - R/L * i_i + 1/L*(u_dst_i - u_src_i)],
                         [u_src_r, u_src_i, u_dst_r, u_dst_i],
                         [i_r, i_i],
                         name=:RLLine)

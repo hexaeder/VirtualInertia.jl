@@ -25,10 +25,14 @@ function VSwithLoad(vs; name=Symbol(string(vs.name)*"_w_load"), params...)
 
     pcs = Components.PerfectCurrentSource(; name=:load, P=:P_load, Q=:Q_load, i_i=:i_load_i, i_r=:i_load_r)
 
+    # i_grid --<--o--<-- i_int
+    #             ^               => 0 = i_int + i_load - i_grid
+    #             | i_load
+
     @variables t i_int_r(t) i_int_i(t)
     @parameters i_r(t) i_i(t) i_load_r(t) i_load_i(t)
-    kirchhoff = IOBlock([i_int_r ~ i_r + i_load_r,
-                         i_int_i ~ i_i + i_load_i],
+    kirchhoff = IOBlock([i_int_r ~ i_r - i_load_r,
+                         i_int_i ~ i_i - i_load_i],
                         [i_r, i_i, i_load_r, i_load_i], [i_int_r, i_int_i])
 
     vs = replace_vars(vs; i_r=:i_int_r, i_i=:i_int_i)
