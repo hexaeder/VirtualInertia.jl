@@ -170,7 +170,7 @@ function inspect_solution(sol, network=sol.prob.f.f.graph, precord=PRecord(sol.p
 
     nodehover = NodeHoverHandler() do state, idx, event, axis
         if state
-            string = """Node $idx """
+            string = nhoverstring(sol, precord, t[], idx)
         else
             string = HOVER_DEFAULT
         end
@@ -343,7 +343,7 @@ function nodeplot_window(sol, precord, tslider, sel_nodes; tlims=Observable((sol
     # click to set time
     # TODO: this blocks the rectagle zoom interaction
     set_time_interaction = (event::MouseEvent, axis) -> begin
-        if event.type === MouseEventTypes.leftclick
+        if event.type === MouseEventTypes.rightclick
             pos = mouseposition(axis.scene)[1]
             set_close_to!(tslider, pos)
             return true
@@ -489,4 +489,18 @@ function read_pos_or_spring(g::MetaGraph)
     else
         return pos
     end
+end
+
+function nhoverstring(sol, precord, t, idx)
+    wrp = _getwrapper(sol, idx)
+    np = precord(t)[1][idx]
+
+    pnames = string.(wrp.params)
+    pmaxlen = mapreduce(length, max, pnames)
+    pnames = rpad.(pnames, pmaxlen)
+
+    pstring = mapreduce(*, zip(pnames, np, treesyms(length(wrp.params)))) do (name, value, ts)
+        ts * " " * string(name) * " = " * repr(value)*"\n"
+    end
+    "Node $idx : $(wrp.name)\n"*pstring[1:end-1]
 end
