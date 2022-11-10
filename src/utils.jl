@@ -8,13 +8,17 @@ function __init__()
 end
 
 """
-    subscript(s, i)
+    subscript(s, i, add...)
 
 Append symbol or string `s` with a integer subscript.
 """
-function subscript(s::T, i::Int) where T <: Union{Symbol, AbstractString}
-    @assert 0≤i≤9 "subscript only supported from 0..9"
-    Symbol(s, Char(0x02080 + i))
+function subscript(s, i, add...)
+    Symbol(s, _subscript(i), add...)
+end
+
+function _subscript(i::Int)
+    dig = reverse(digits(i))
+    String(map(i -> Char(0x02080 + i), dig))
 end
 
 # dq transformations

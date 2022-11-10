@@ -89,10 +89,10 @@ function BusBar(injectors...; name=:Bus, verbose=false, autopromote=false, EMT=t
     @variables t
     ir, ii = Num[], Num[]
     for i in 1:length(injectors)
-        irs = subscript(:i_r, i)
-        iqs = subscript(:i_i, i)
+        irs = subscript("i", i, "_r")
+        iis = subscript("i", i, "_i")
         append!(ir, @parameters $irs(t))
-        append!(ii, @parameters $iqs(t))
+        append!(ii, @parameters $iis(t))
     end
 
     @parameters i_r(t) i_i(t)
@@ -118,8 +118,8 @@ function BusBar(injectors...; name=:Bus, verbose=false, autopromote=false, EMT=t
 
     connections = Pair[]
     for (i, inj) in enumerate(injectors)
-        push!(connections, inj.i_r => getproperty(bar, subscript(:i_r, i)))
-        push!(connections, inj.i_i => getproperty(bar, subscript(:i_i, i)))
+        push!(connections, inj.i_r => getproperty(bar, subscript("i", i, "_r")))
+        push!(connections, inj.i_i => getproperty(bar, subscript("i", i, "_i")))
         push!(connections, bar.u_r => inj.u_r)
         push!(connections, bar.u_i => inj.u_i)
     end
