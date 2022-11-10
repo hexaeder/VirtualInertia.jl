@@ -40,7 +40,7 @@ function NetworkDynamics.ODEVertex(inner::IOBlock, outer::IOBlock, p_order=[])
 end
 
 function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
-    @assert length(p_order) == length(iob.iparams) "Provide order of all iparams: $(getname.(iob.iparams))"
+    @assert Set(Symbol.(iob.iparams)) ⊆ Set(Symbol.(p_order)) "Provide order of all iparams: $(getname.(iob.iparams))"
 
     if fulfills(iob, BlockSpec([:i_r, :i_i], [:u_r, :u_i]))
         # normal node

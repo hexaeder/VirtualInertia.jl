@@ -36,11 +36,11 @@ staticpiline = StaticEdge(lineblk, [:R, :X, :B]);
 #####
 ##### Inverter Model
 #####
-SWING = true
+SWING = false
 generator = if !SWING
     inner = PerfectSource()
     # inner = PT1Source()
-    outer = DroopControl(;V_ref=1, ω_ref=0, τ_P=:τ, τ_Q=:τ, K_P=:K, K_Q=:K)
+    outer = DroopControl(;V_ref=1, ω_ref=0, τ_P=:τ, τ_Q=0.01, K_P=:K, K_Q=1e-10)
     # here i've renamed K_Q and K_P in a way that they are the same
     invblk = Inverter(inner, outer; name=:inv)
     # we can add a load to the voltage source
@@ -75,16 +75,19 @@ edgeP = zip(R, X, B) |> collect
 # Inverters: Pload, Qload, Pref, Qref, τ, K
 gens = filter(n -> n.type ∈ (:gen, :syncon), nodes_df)
 
-τinv = 0.01
-Kinv = 0.1
-Dswing = 0.1
+Dswing = 0.2
+Kinv = 1/Dswing
+τinv = 2*Kinv*ustrip.(gens.H)/(2π*50)
+# Large values of τ are problematic during initialization, because the converter can not "react" to the actual
+# power because p_filt will be so slow
+τinv_init = 1e-5
 
 gen_para = if !SWING
     collect(zip(ustrip.(u"pu", gens.P_load),
                 ustrip.(u"pu", gens.Q_load),
                 ustrip.(u"pu", gens.P_inj),
                 ustrip.(u"pu", gens.Q_inj),
-                Iterators.cycle(τinv),
+                Iterators.cycle(τinv_init),
                 Iterators.cycle(Kinv)))
 else
     collect(zip(ustrip.(u"pu", gens.P_load),
@@ -124,6 +127,11 @@ uguess = u0guess(nd)
 ssprob = SteadyStateProblem(nd, uguess, params)
 u0 = solve(ssprob, DynamicSS(Rodas4()));
 
+# now we may change the τ to τinv!
+if !SWING
+    @views reinterpret(reshape, Float64, nodeP)[5, :][gens.n] .= τinv
+end
+
 #####
 ##### Disturb system
 #####
@@ -152,4 +160,5 @@ end
 cb = PresetTimeCallback(0.1, affect)
 GLMakie.closeall()
 sol = solve(prob, Rodas4(); dtmax=(prob.tspan[2]-prob.tspan[1])/1000, callback=cb);
+
 fig = inspect_solution(sol, network, precord)
