@@ -226,7 +226,7 @@ function flowsum(edges)
 end
 
 
-include("Components.jl")
+include("components.jl")
 include("inverter.jl")
 include("models.jl")
 include("solution_inspection.jl")
