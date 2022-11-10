@@ -67,18 +67,6 @@ function NetworkDynamics.ODEVertex(iob::IOBlock, p_order=[])
     ODEVertex(; f, dim=length(vars), sym=vars, mass_matrix=gen.massm)
 end
 
-# special function definition for empty bus
-# function BusBar(; name=gensym(:Bus), verbose=false)
-#     # busBar without any elements
-#     @parameters t i_r(t) i_i(t) C ω0
-#     @variables u_r(t) u_i(t)
-
-#     bar = IOBlock([dt(u_r) ~ -ω0 * u_i - 1 / C * i_r,
-#                    dt(u_i) ~ -ω0 * u_r - 1 / C * i_i],
-#                   [i_r, i_i], [u_r, u_i];
-#                   iv=t, name, warn=false)
-# end
-
 export BusBar
 function BusBar(injectors...; name=:Bus, verbose=false, autopromote=false, EMT=true)
     for inj in injectors
