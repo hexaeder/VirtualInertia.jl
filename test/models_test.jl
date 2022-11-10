@@ -429,3 +429,69 @@ end
 
     @reftest "Synchronverter_loadchange_omega" ωplot = Plots.plot(timeseries(sol,2,:ω))
 end
+
+@testset "Test swing with load" begin
+    swingblk = VirtualInertia.SwingEquation(; ω0=2π*50, u_mag=1)
+    swingloadblk = VSwithLoad(swingblk)
+    equations(swingloadblk)
+    generator = ODEVertex(swingloadblk, [:P_load, :Q_load, :P_ref, :H, :D]);
+    load = ODEVertex(PT1Load(τ=0.01), [:P_load, :Q_load])
+    staticpiline = StaticEdge(BSPiLine(; B_src=:B, B_dst=:B), [:R, :X, :B]);
+
+    g = complete_graph(2)
+
+    nodep = [(-1, -0.25, 2, 5, 0.1),
+             (-1, -0.25, NaN, NaN, NaN)]
+    edgep = (0, 0.07, 0.14/2)
+    p = (nodep, edgep)
+
+    nd = network_dynamics([generator, load], staticpiline, g)
+
+    u0 = u0guess(nd)
+    prob = ODEProblem(nd, u0, (0, 10), p)
+    sol = solve(prob, Rodas4());
+    p0 = Plots.plot(sol)
+
+    p1 = Plots.plot(timeseries(sol, 1, :_ω))
+    Plots.plot!(timeseries(sol, 2, :_ω))
+
+    p2 = Plots.plot(timeseries(sol, 1, :_P))
+    Plots.plot!(timeseries(sol, 2, :_P))
+
+    p3 = Plots.plot(timeseries(sol, 1, :_Q))
+    Plots.plot!(timeseries(sol, 2, :_Q))
+    @reftest "swing_w_load_on_load" Plots.plot(p0, p1,p2,p3; size=(1000,1000))
+end
+
+@testset "Test two swing nodes with laod" begin
+    swingblk = VirtualInertia.SwingEquation(; ω0=2π*50, u_mag=1)
+    swingloadblk = VSwithLoad(swingblk)
+    equations(swingloadblk)
+    generator = ODEVertex(swingloadblk, [:P_load, :Q_load, :P_ref, :H, :D]);
+    staticpiline = StaticEdge(BSPiLine(; B_src=:B, B_dst=:B), [:R, :X, :B]);
+    g = complete_graph(2)
+    nd = network_dynamics(generator, staticpiline, g)
+    u0 = u0guess(nd)
+
+    H = 10
+    D = 0.2
+    nodep = [(-0.1,0,  1.2, H, D),
+             (-0.2,0, -0.9, H, D)]
+    edgep = (0, 0.07, 0.14/2)
+    p = (nodep, edgep)
+    prob = ODEProblem(nd, u0, (0, 10), p)
+    sol = solve(prob, Rodas4());
+    @reftest "swing_w_load" Plots.plot(sol)
+
+    # lets see if it also works if there is no power injected by the swing itself
+    H = 10
+    D = 0.2
+    nodep = [( 10, 0, 0, H, D),
+             (-10, 0, 0, H, D)]
+    edgep = (0, 0.07, 0.14/2)
+    p = (nodep, edgep)
+    prob = ODEProblem(nd, u0, (0, 10), p)
+    sol = solve(prob, Rodas4());
+    Plots.plot(sol)
+    @reftest "swing_w_injection" Plots.plot(sol)
+end
